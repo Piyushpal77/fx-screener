@@ -1,0 +1,39 @@
+provider:
+  active: yfinance
+  cache_ttl_seconds: 300
+  auto_refresh_seconds: 300
+  oanda:
+    api_key: ''
+    account_id: ''
+    environment: practice
+scoring:
+  timeframe_weights:
+    D1: 0.5
+    H4: 0.3
+    W1: 0.2
+  pillar_weights:
+    trend: 0.35
+    strength: 0.25
+    momentum: 0.25
+    volatility: 0.15
+  thresholds:
+    strong_buy: 60.0
+    buy: 25.0
+    sell: -25.0
+    strong_sell: -60.0
+    confluence_min_tf_score: 20.0
+    alert_threshold: 70.0
+risk:
+  account_balance_usd: 10000.0
+  risk_percent: 1.0
+  atr_timeframe: D1
+  sl_atr_multiplier: 1.5
+  tp_r_multiples:
+  - 1.5
+  - 2.0
+  - 3.0
+watchlist:
+- EUR/USD
+- GBP/JPY
+- XAU/USD
+- USD/CAD

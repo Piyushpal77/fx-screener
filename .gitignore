@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Pytest
+.pytest_cache/
+.coverage
+
+# Local SQLite Cache & Exports
+.fx_screener_cache.sqlite3*
+screener_export.csv
+screener_export.json
+
+# IDE
+.vscode/
+.idea/

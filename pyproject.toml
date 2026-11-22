@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fx-screener"
+version = "1.0.0"
+description = "Multi-Factor FX & Precious Metals Terminal Screener (H4, D1, W1)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "PyYAML>=6.0",
+    "rich>=13.0",
+    "textual>=0.80",
+    "yfinance>=0.2.40",
+    "requests>=2.31",
+]
+
+[project.scripts]
+fx-screener = "fx_screener.__main__:main"
