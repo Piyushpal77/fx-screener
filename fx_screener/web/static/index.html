@@ -852,6 +852,13 @@
       <div class="status-pill">
         <span class="status-dot"></span>
         <span id="status-source">Loading...</span>
+        <select id="sel-autorefresh" onchange="setAutoRefreshInterval(this.value)" style="background:transparent; border:none; color:var(--accent); font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; cursor:pointer; outline:none;" title="Auto-Refresh Interval during trading hours">
+          <option value="60" style="background:#0d131f;">Auto: 1m</option>
+          <option value="300" selected style="background:#0d131f;">Auto: 5m</option>
+          <option value="900" style="background:#0d131f;">Auto: 15m</option>
+          <option value="0" style="background:#0d131f;">Auto: Off</option>
+        </select>
+        <span class="mono" id="status-countdown" style="color:var(--text-dim); font-size:10.5px;"></span>
       </div>
 
       <button class="btn btn-primary" onclick="refreshMarketData()" id="btn-refresh">
@@ -996,6 +1003,36 @@
     let showTradeLevels = true;
     let activeSubchart = "rsi";
     let lastChartPayload = null;
+    let autoRefreshSeconds = 300;
+    let countdownRemaining = 300;
+    let countdownTimerId = null;
+
+    function startAutoRefreshCountdown() {
+      if (countdownTimerId) clearInterval(countdownTimerId);
+      countdownRemaining = autoRefreshSeconds;
+      const el = document.getElementById("status-countdown");
+      if (autoRefreshSeconds <= 0) {
+        if (el) el.textContent = "";
+        return;
+      }
+      countdownTimerId = setInterval(async () => {
+        countdownRemaining--;
+        if (el) {
+          const m = Math.floor(Math.max(0, countdownRemaining) / 60);
+          const s = Math.max(0, countdownRemaining) % 60;
+          el.textContent = `(${m}:${s < 10 ? '0' : ''}${s})`;
+        }
+        if (countdownRemaining <= 0) {
+          countdownRemaining = autoRefreshSeconds;
+          await refreshMarketData();
+        }
+      }, 1000);
+    }
+
+    function setAutoRefreshInterval(val) {
+      autoRefreshSeconds = parseInt(val, 10) || 0;
+      startAutoRefreshCountdown();
+    }
 
     // Lightweight Charts instances
     let mainChart = null;
@@ -1578,6 +1615,7 @@
     window.addEventListener("DOMContentLoaded", async () => {
       initCharts();
       await loadScreenerData();
+      startAutoRefreshCountdown();
     });
   </script>
 </body>

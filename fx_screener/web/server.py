@@ -66,6 +66,13 @@ class ScreenerWebState:
                 self.universe_data, self.config, source=source
             )
             self.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.last_refresh_epoch = datetime.now().timestamp()
+
+    def ensure_fresh(self) -> None:
+        ttl = max(30, int(self.config.provider.auto_refresh_seconds or 300))
+        now_ts = datetime.now().timestamp()
+        if getattr(self, "last_refresh_epoch", 0.0) + ttl <= now_ts:
+            self.refresh(force=True)
 
     def recompute(self) -> None:
         with self.lock:
@@ -180,6 +187,7 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
 
     @app.get("/api/screener")
     def get_screener() -> Dict[str, Any]:
+        state.ensure_fresh()
         res = state.result
         if res is None:
             raise HTTPException(status_code=503, detail="Screener state not initialized")
@@ -187,6 +195,7 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         return {
             "source": res.source,
             "last_updated": state.last_updated,
+            "auto_refresh_seconds": state.config.provider.auto_refresh_seconds,
             "risk_config": {
                 "account_balance_usd": state.config.risk.account_balance_usd,
                 "risk_percent": state.config.risk.risk_percent,
