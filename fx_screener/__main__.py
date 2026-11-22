@@ -153,17 +153,28 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # Mode 3 (Default): Professional Interactive Web UI with W1, D1, H4, H1 Charts
+    import socket
     import uvicorn
     from fx_screener.web.server import create_web_app
 
+    port = args.port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        if sock.connect_ex((args.host, port)) == 0:
+            # Port is already occupied; find next available port
+            for candidate in range(port + 1, port + 50):
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+                    if s2.connect_ex((args.host, candidate)) != 0:
+                        port = candidate
+                        break
+
     web_app = create_web_app(config=config)
-    url = f"http://{args.host}:{args.port}"
+    url = f"http://{args.host}:{port}"
     print(f"\n  ★ FX & Precious Metals Multi-Factor Terminal UI running at: {url}\n")
 
     if not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 
-    uvicorn.run(web_app, host=args.host, port=args.port, log_level="info")
+    uvicorn.run(web_app, host=args.host, port=port, log_level="info")
     return 0
 
 
