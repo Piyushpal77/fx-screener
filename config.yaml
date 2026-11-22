@@ -26,7 +26,7 @@ scoring:
 risk:
   account_balance_usd: 10000.0
   risk_percent: 1.0
-  atr_timeframe: D1
+  atr_timeframe: H4
   sl_atr_multiplier: 1.5
   tp_r_multiples:
   - 1.5

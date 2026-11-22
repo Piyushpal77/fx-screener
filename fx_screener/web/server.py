@@ -297,10 +297,15 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
             if np.isfinite(bu) and np.isfinite(bl):
                 bb_upper_pts.append({"time": ts, "value": round(bu, dec)})
                 bb_lower_pts.append({"time": ts, "value": round(bl, dec)})
+            else:
+                bb_upper_pts.append({"time": ts})
+                bb_lower_pts.append({"time": ts})
 
             rv = float(rsi_s.loc[idx])
             if np.isfinite(rv):
                 rsi_pts.append({"time": ts, "value": round(rv, 2)})
+            else:
+                rsi_pts.append({"time": ts})
 
             mh = float(macd_h.loc[idx])
             ml = float(macd_l.loc[idx])
@@ -315,6 +320,10 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
                 )
                 macd_line_pts.append({"time": ts, "value": round(ml, dec + 1)})
                 macd_sig_pts.append({"time": ts, "value": round(ms, dec + 1)})
+            else:
+                macd_hist_pts.append({"time": ts})
+                macd_line_pts.append({"time": ts})
+                macd_sig_pts.append({"time": ts})
 
         # Compute on-the-fly timeframe snapshot & pillar breakdown for H1/H4/D1/W1
         snap = compute_indicators(work)

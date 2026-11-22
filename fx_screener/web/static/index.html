@@ -1061,6 +1061,7 @@
         },
         rightPriceScale: {
           borderColor: '#1e293b',
+          minimumWidth: 78,
         },
         timeScale: {
           borderColor: '#1e293b',
@@ -1098,6 +1099,7 @@
         },
         rightPriceScale: {
           borderColor: '#1e293b',
+          minimumWidth: 78,
         },
         timeScale: {
           borderColor: '#1e293b',
@@ -1110,9 +1112,35 @@
       macdLineSeries = subChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, visible: false });
       macdSigSeries = subChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, visible: false });
 
-      // Synchronize visible time range between main chart and sub chart
+      // Bidirectional visible logical range & crosshair synchronization between main chart and subchart
+      let isSyncingRange = false;
       mainChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (range) subChart.timeScale().setVisibleLogicalRange(range);
+        if (isSyncingRange || !range) return;
+        isSyncingRange = true;
+        subChart.timeScale().setVisibleLogicalRange(range);
+        isSyncingRange = false;
+      });
+      subChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        if (isSyncingRange || !range) return;
+        isSyncingRange = true;
+        mainChart.timeScale().setVisibleLogicalRange(range);
+        isSyncingRange = false;
+      });
+
+      mainChart.subscribeCrosshairMove((param) => {
+        if (!param || !param.time) {
+          subChart.clearCrosshairPosition();
+          return;
+        }
+        const targetSeries = activeSubchart === "rsi" ? rsiSeries : macdLineSeries;
+        subChart.setCrosshairPosition(0, param.time, targetSeries);
+      });
+      subChart.subscribeCrosshairMove((param) => {
+        if (!param || !param.time) {
+          mainChart.clearCrosshairPosition();
+          return;
+        }
+        mainChart.setCrosshairPosition(0, param.time, candleSeries);
       });
 
       window.addEventListener("resize", () => {
@@ -1323,11 +1351,14 @@
       drawTradeLevelLines(data.trade_plan);
       renderSubchartData(data);
 
-      // Reset both X (time) and Y (price) scales to fit the newly selected pair cleanly
+      // Reset both X (time) and Y (price) scales and lock subchart to exact mainChart logical range
       mainChart.priceScale('right').applyOptions({ autoScale: true });
       subChart.priceScale('right').applyOptions({ autoScale: true });
       mainChart.timeScale().fitContent();
-      subChart.timeScale().fitContent();
+      const mainRange = mainChart.timeScale().getVisibleLogicalRange();
+      if (mainRange) {
+        subChart.timeScale().setVisibleLogicalRange(mainRange);
+      }
 
       if (pairMeta) {
         renderInspectorPanels(pairMeta, data);
@@ -1361,22 +1392,28 @@
     }
 
     function renderSubchartData(data) {
+      // Always populate all subchart series with matching timestamps so logical indices stay 1:1 with candles
+      rsiSeries.setData(data.rsi14 || []);
+      macdHistSeries.setData(data.macd_hist || []);
+      macdLineSeries.setData(data.macd_line || []);
+      macdSigSeries.setData(data.macd_signal || []);
+
       if (activeSubchart === "rsi") {
         document.getElementById("subchart-title").textContent = `RSI (14) — Current: ${data.tf_summary.rsi14}`;
         rsiSeries.applyOptions({ visible: true });
         macdHistSeries.applyOptions({ visible: false });
         macdLineSeries.applyOptions({ visible: false });
         macdSigSeries.applyOptions({ visible: false });
-        rsiSeries.setData(data.rsi14);
       } else {
         document.getElementById("subchart-title").textContent = `MACD (12, 26, 9) Histogram & Signal`;
         rsiSeries.applyOptions({ visible: false });
         macdHistSeries.applyOptions({ visible: true });
         macdLineSeries.applyOptions({ visible: true });
         macdSigSeries.applyOptions({ visible: true });
-        macdHistSeries.setData(data.macd_hist);
-        macdLineSeries.setData(data.macd_line);
-        macdSigSeries.setData(data.macd_signal);
+      }
+      const mainRange = mainChart.timeScale().getVisibleLogicalRange();
+      if (mainRange) {
+        subChart.timeScale().setVisibleLogicalRange(mainRange);
       }
     }
 
