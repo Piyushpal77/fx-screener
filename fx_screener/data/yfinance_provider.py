@@ -132,6 +132,7 @@ class YFinanceProvider(MarketDataProvider):
 
             if not df_h4.empty and not df_d1.empty and not df_w1.empty:
                 result[spec.pair] = {
+                    "H1": df_1h.tail(320),
                     "H4": df_h4.tail(260),
                     "D1": df_d1.tail(260),
                     "W1": df_w1.tail(220),

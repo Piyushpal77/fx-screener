@@ -1,10 +1,12 @@
-"""Main CLI and Textual TUI entry point for the FX & Precious Metals Screener."""
+"""Main Web UI, Textual TUI, and Rich CLI entry point for the FX & Precious Metals Screener."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 import sys
+import threading
+import webbrowser
 from rich.console import Console
 
 from fx_screener.config import AppConfig
@@ -20,7 +22,7 @@ from fx_screener.ui.cli_renderer import (
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="fx-screener",
-        description="Multi-Factor FX & Precious Metals Terminal Screener (28 G8 Pairs + XAU/USD + XAG/USD)",
+        description="Multi-Factor FX & Precious Metals Screener (Interactive Web UI, Textual TUI, & Rich CLI)",
     )
     parser.add_argument(
         "--config",
@@ -29,9 +31,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Path to config.yaml (defaults to ./config.yaml)",
     )
     parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Launch the interactive Web UI with candlestick charts (W1, D1, H4, H1) [Default mode]",
+    )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch the interactive Textual Terminal UI inside PowerShell/terminal",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Run in headless one-shot CLI mode: print Rich table + G8 Strength Matrix and exit",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host for the Web UI server (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8050,
+        help="Port for the Web UI server (default: 8050)",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not automatically open the browser when starting the Web UI server",
     )
     parser.add_argument(
         "--refresh",
@@ -96,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.risk is not None and args.risk > 0:
         config.risk.risk_percent = args.risk
 
+    # Mode 1: One-Shot CLI / Export
     if args.once or args.export:
         console = Console(width=165)
         universe_data, source = load_or_fetch_universe(config, force_refresh=args.refresh)
@@ -114,10 +144,26 @@ def main(argv: list[str] | None = None) -> int:
             console.print(f"[bold green]✔ Exported {len(filtered)} instruments to:[/bold green] {out_path.resolve()}")
         return 0
 
-    from fx_screener.ui.app import FxScreenerApp
+    # Mode 2: Terminal UI (Textual)
+    if args.tui:
+        from fx_screener.ui.app import FxScreenerApp
 
-    app = FxScreenerApp(config=config)
-    app.run()
+        app = FxScreenerApp(config=config)
+        app.run()
+        return 0
+
+    # Mode 3 (Default): Professional Interactive Web UI with W1, D1, H4, H1 Charts
+    import uvicorn
+    from fx_screener.web.server import create_web_app
+
+    web_app = create_web_app(config=config)
+    url = f"http://{args.host}:{args.port}"
+    print(f"\n  ★ FX & Precious Metals Multi-Factor Terminal UI running at: {url}\n")
+
+    if not args.no_browser:
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+
+    uvicorn.run(web_app, host=args.host, port=args.port, log_level="info")
     return 0
 
 

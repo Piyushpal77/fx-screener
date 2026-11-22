@@ -10,7 +10,7 @@ import pandas as pd
 from fx_screener.universe import ALL_PAIRS, UNIVERSE_MAP
 
 
-TIMEFRAMES = ("H4", "D1", "W1")
+TIMEFRAMES = ("H1", "H4", "D1", "W1")
 
 # Realistic baseline reference prices for synthetic/offline fallback
 BASELINE_PRICES: Dict[str, float] = {
@@ -100,40 +100,37 @@ class SyntheticProvider(MarketDataProvider):
             base_price = BASELINE_PRICES.get(pair, 1.0)
             net_drift = ccy_drift.get(spec.base, 0.0) - ccy_drift.get(spec.quote, 0.0)
 
-            # Generate 1500 H4 bars (~250 trading days / ~50 weeks)
-            n_h4 = 1500
+            # Generate 2400 H1 bars (~100 trading days) for realistic H1 -> H4 -> D1 -> W1 hierarchy
+            n_h1 = 2400
             pair_rng = np.random.default_rng(self.seed + idx * 17)
 
             # Regime-switching volatility so some pairs are in Bollinger Squeeze or Breakout
-            vol_base = 0.0022 if spec.category != "Commodity" else 0.0040
-            vol_profile = np.full(n_h4, vol_base)
+            vol_base = 0.0011 if spec.category != "Commodity" else 0.0020
+            vol_profile = np.full(n_h1, vol_base)
             if idx % 5 == 0:
-                # Tight Bollinger Squeeze on last 25 bars
-                vol_profile[-28:] = vol_base * 0.35
+                vol_profile[-80:] = vol_base * 0.35
             elif idx % 4 == 0:
-                # Fresh volatility breakout on last 6 bars
-                vol_profile[-30:-6] = vol_base * 0.45
-                vol_profile[-6:] = vol_base * 1.95
+                vol_profile[-90:-18] = vol_base * 0.45
+                vol_profile[-18:] = vol_base * 1.95
 
-            shocks = pair_rng.normal(loc=net_drift * 0.35, scale=vol_profile)
-            # Add cyclical swing component + recent directional impulse
-            t = np.linspace(0, 14 * np.pi, n_h4)
-            cycle = 0.0004 * np.sin(t + idx)
+            shocks = pair_rng.normal(loc=net_drift * 0.12, scale=vol_profile)
+            t = np.linspace(0, 18 * np.pi, n_h1)
+            cycle = 0.0002 * np.sin(t + idx)
             returns = shocks + cycle
             if idx % 4 == 0:
-                returns[-6:] += np.sign(net_drift or 1.0) * vol_base * 1.25
+                returns[-18:] += np.sign(net_drift or 1.0) * vol_base * 0.95
 
             close_series = base_price * np.exp(np.cumsum(returns) - np.sum(returns))
             open_series = np.roll(close_series, 1)
             open_series[0] = close_series[0] * (1.0 - returns[0])
 
-            intrabar_range = np.abs(pair_rng.normal(0.0, vol_profile * 0.75, size=n_h4)) * close_series
+            intrabar_range = np.abs(pair_rng.normal(0.0, vol_profile * 0.75, size=n_h1)) * close_series
             high_series = np.maximum(open_series, close_series) + intrabar_range
             low_series = np.minimum(open_series, close_series) - intrabar_range
-            volume_series = pair_rng.integers(1200, 9500, size=n_h4).astype(float)
+            volume_series = pair_rng.integers(400, 4500, size=n_h1).astype(float)
 
-            h4_index = pd.date_range(end=now, periods=n_h4, freq="4h", tz="UTC")
-            df_h4 = pd.DataFrame(
+            h1_index = pd.date_range(end=now, periods=n_h1, freq="1h", tz="UTC")
+            df_h1 = pd.DataFrame(
                 {
                     "Open": open_series,
                     "High": high_series,
@@ -141,13 +138,15 @@ class SyntheticProvider(MarketDataProvider):
                     "Close": close_series,
                     "Volume": volume_series,
                 },
-                index=h4_index,
+                index=h1_index,
             )
 
+            df_h4 = resample_ohlcv(df_h1, "4h")
             df_d1 = resample_ohlcv(df_h4, "1D")
             df_w1 = resample_ohlcv(df_d1, "1W")
 
             result[pair] = {
+                "H1": df_h1.tail(320),
                 "H4": df_h4.tail(260),
                 "D1": df_d1.tail(260),
                 "W1": df_w1.tail(160),

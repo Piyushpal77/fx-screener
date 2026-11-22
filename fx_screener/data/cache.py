@@ -55,7 +55,7 @@ class MarketDataCache:
                 """
             )
 
-    def is_fresh(self, pairs: List[str], timeframes: tuple[str, ...] = ("H4", "D1", "W1")) -> bool:
+    def is_fresh(self, pairs: List[str], timeframes: tuple[str, ...] = ("H1", "H4", "D1", "W1")) -> bool:
         now = time.time()
         with self._connect() as conn:
             rows = conn.execute(
@@ -134,7 +134,7 @@ class MarketDataCache:
             )
 
     def load_universe(
-        self, pairs: List[str], timeframes: tuple[str, ...] = ("H4", "D1", "W1")
+        self, pairs: List[str], timeframes: tuple[str, ...] = ("H1", "H4", "D1", "W1")
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
         result: Dict[str, Dict[str, pd.DataFrame]] = {p: {} for p in pairs}
         with self._connect() as conn:
@@ -158,5 +158,9 @@ class MarketDataCache:
                     df["ts"] = pd.to_datetime(df["ts"], utc=True)
                     df = df.set_index("ts")
                     result[pair][tf] = df
-        # Remove empty pairs
-        return {p: tfs for p, tfs in result.items() if len(tfs) == len(timeframes)}
+        # Keep pairs that have at least H4, D1, W1
+        return {
+            p: tfs
+            for p, tfs in result.items()
+            if all(req in tfs for req in ("H4", "D1", "W1"))
+        }

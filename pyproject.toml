@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fx-screener"
-version = "1.0.0"
-description = "Multi-Factor FX & Precious Metals Terminal Screener (H4, D1, W1)"
+version = "1.1.0"
+description = "Multi-Factor FX & Precious Metals Screener with Interactive W1/D1/H4/H1 Charts"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,6 +16,8 @@ dependencies = [
     "textual>=0.80",
     "yfinance>=0.2.40",
     "requests>=2.31",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [project.scripts]

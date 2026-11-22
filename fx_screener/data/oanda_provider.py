@@ -16,6 +16,7 @@ class OandaProvider(MarketDataProvider):
     name: str = "oanda"
 
     GRANULARITY_MAP = {
+        "H1": "H1",
         "H4": "H4",
         "D1": "D",
         "W1": "W",
@@ -75,6 +76,6 @@ class OandaProvider(MarketDataProvider):
                 df = self._fetch_candles(spec.oanda_instrument, gran, count=250)
                 if not df.empty:
                     tfs[tf] = df
-            if len(tfs) == 3:
+            if len(tfs) >= 3:
                 result[pair] = tfs
         return result

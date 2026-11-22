@@ -30,9 +30,20 @@ Built with **Textual** (interactive TUI dashboard) and **Rich** (one-shot CLI & 
 
 ## Quick Start
 
-### 1. Launch the Interactive Terminal UI (`Textual`)
+### 1. Launch the Interactive Web UI (Default)
+Double-click `run_screener.bat` in Windows Explorer or run:
 ```powershell
-python -m fx_screener
+.\run_screener.bat
+```
+This starts the FastAPI + TradingView Lightweight Charts UI at `http://127.0.0.1:8050` and opens it in your browser.
+- **Click any FX pair or metal** in the screener table (or top divergence chips) to load its interactive candlestick chart.
+- **Switch timeframes** from **W1 (Weekly)** → **D1 (Daily)** → **H4 (4-Hour)** → **H1 (Hourly)**.
+- **Toggle overlays**: `EMA 20/50/200`, `Bollinger Bands (20, 2)`, `Entry / Stop-Loss / TP1 / TP2` price lines, and switch the subchart between `RSI (14)` and `MACD (12, 26, 9)`.
+- **Click any G8 Currency card** (`USD`, `EUR`, `GBP`, `JPY`, etc.) to filter all pairs containing that currency.
+
+### 2. Launch the Terminal UI (`Textual`) in PowerShell
+```powershell
+.\run_screener.bat --tui
 ```
 
 ### 2. Keyboard Shortcuts in the Terminal UI

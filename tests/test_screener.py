@@ -32,7 +32,7 @@ def test_synthetic_provider_and_indicators() -> None:
     data = provider.fetch_universe()
     assert len(data) == 30
     for pair in ("EUR/USD", "GBP/JPY", "XAU/USD", "XAG/USD"):
-        assert set(data[pair].keys()) == {"H4", "D1", "W1"}
+        assert set(data[pair].keys()) == {"H1", "H4", "D1", "W1"}
         snap_d1 = compute_indicators(data[pair]["D1"])
         assert snap_d1.close > 0
         assert 0.0 <= snap_d1.rsi14 <= 100.0
@@ -135,3 +135,19 @@ def test_sqlite_cache_and_export(tmp_path: Path) -> None:
     assert csv_out.exists()
     assert json_out.exists()
     assert len(make_sparkline([1.0, 1.1, 1.05, 1.2, 1.15])) == 5
+
+
+def test_web_app_chart_endpoints() -> None:
+    from fx_screener.web.server import create_web_app
+
+    cfg = AppConfig()
+    cfg.provider.active = "synthetic"
+    app = create_web_app(config=cfg)
+    state = app.state.screener
+    assert state.result is not None
+    assert len(state.result.pairs) == 30
+
+    # Verify all 4 timeframes (W1, D1, H4, H1) exist for interactive charting
+    for tf in ("W1", "D1", "H4", "H1"):
+        df = state.universe_data["EUR/USD"].get(tf)
+        assert df is not None and not df.empty
