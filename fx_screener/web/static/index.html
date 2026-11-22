@@ -942,15 +942,6 @@
       </div>
 
       <div class="charts-wrapper">
-        <div class="chart-legend mono" id="chart-legend">
-          <div class="legend-row" id="legend-ohlc">O: - H: - L: - C: -</div>
-          <div class="legend-row" style="font-size:10.5px;">
-            <span style="color:#38bdf8;">● EMA 20</span>
-            <span style="color:#f59e0b;">● EMA 50</span>
-            <span style="color:#a855f7;">● EMA 200</span>
-            <span style="color:#64748b;">● BB(20, 2)</span>
-          </div>
-        </div>
         <div id="main-chart"></div>
         <div class="subchart-header">
           <span class="mono" id="subchart-title">RSI (14) Oscillator & Momentum</span>
@@ -1087,22 +1078,12 @@
         wickDownColor: '#ef4444',
       });
 
-      ema20Series = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
-      ema50Series = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false });
-      ema200Series = mainChart.addLineSeries({ color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+      ema20Series = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      ema50Series = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      ema200Series = mainChart.addLineSeries({ color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
-      bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-      bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
-
-      mainChart.subscribeCrosshairMove((param) => {
-        if (!param || !param.time || !param.seriesData) return;
-        const d = param.seriesData.get(candleSeries);
-        if (d) {
-          const dec = lastChartPayload ? lastChartPayload.decimals : 5;
-          document.getElementById("legend-ohlc").innerHTML =
-            `<b>${selectedPair} (${selectedTimeframe})</b> &nbsp; O: ${d.open.toFixed(dec)} &nbsp; H: ${d.high.toFixed(dec)} &nbsp; L: ${d.low.toFixed(dec)} &nbsp; C: ${d.close.toFixed(dec)}`;
-        }
-      });
+      bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
       subChart = LightweightCharts.createChart(subEl, {
         layout: {
@@ -1306,7 +1287,7 @@
     }
 
     async function loadPairChart(pair, tf) {
-      const resp = await fetch(`/api/chart?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`);
+      const resp = await fetch(`/api/chart?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}&_t=${Date.now()}`);
       if (!resp.ok) return;
       const data = await resp.json();
       lastChartPayload = data;
@@ -1321,27 +1302,32 @@
           `<span class="signal-badge ${getSignalClass(pairMeta.signal)}">${pairMeta.signal} (${pairMeta.composite_score >= 0 ? '+' : ''}${pairMeta.composite_score.toFixed(1)})</span>`;
       }
 
+      // Remove previous pair's price lines BEFORE updating candle data so the y-axis doesn't stay stretched to the old pair's price scale
+      activePriceLines.forEach(line => {
+        try { candleSeries.removePriceLine(line); } catch (e) {}
+      });
+      activePriceLines = [];
+
       candleSeries.applyOptions({
         priceFormat: { type: 'price', precision: dec, minMove: Math.pow(10, -dec) }
       });
-      candleSeries.setData(data.candles);
+      candleSeries.setData(data.candles || []);
 
-      ema20Series.setData(showEMA ? data.ema20 : []);
-      ema50Series.setData(showEMA ? data.ema50 : []);
-      ema200Series.setData(showEMA ? data.ema200 : []);
+      ema20Series.setData(showEMA ? (data.ema20 || []) : []);
+      ema50Series.setData(showEMA ? (data.ema50 || []) : []);
+      ema200Series.setData(showEMA ? (data.ema200 || []) : []);
 
-      bbUpperSeries.setData(showBB ? data.bb_upper : []);
-      bbLowerSeries.setData(showBB ? data.bb_lower : []);
-
-      if (data.candles.length > 0) {
-        const last = data.candles[data.candles.length - 1];
-        document.getElementById("legend-ohlc").innerHTML =
-          `<b>${pair} (${tf})</b> &nbsp; O: ${last.open.toFixed(dec)} &nbsp; H: ${last.high.toFixed(dec)} &nbsp; L: ${last.low.toFixed(dec)} &nbsp; C: ${last.close.toFixed(dec)}`;
-      }
+      bbUpperSeries.setData(showBB ? (data.bb_upper || []) : []);
+      bbLowerSeries.setData(showBB ? (data.bb_lower || []) : []);
 
       drawTradeLevelLines(data.trade_plan);
       renderSubchartData(data);
+
+      // Reset both X (time) and Y (price) scales to fit the newly selected pair cleanly
+      mainChart.priceScale('right').applyOptions({ autoScale: true });
+      subChart.priceScale('right').applyOptions({ autoScale: true });
       mainChart.timeScale().fitContent();
+      subChart.timeScale().fitContent();
 
       if (pairMeta) {
         renderInspectorPanels(pairMeta, data);

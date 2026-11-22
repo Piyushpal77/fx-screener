@@ -247,6 +247,8 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         spec = UNIVERSE_MAP[pair_key]
         dec = spec.decimals
         work = df.copy().sort_index()
+        work = work[~work.index.duplicated(keep="last")]
+        work = work.replace([np.inf, -np.inf], np.nan).dropna(subset=["Open", "High", "Low", "Close"])
         close_s = work["Close"].astype(float)
 
         ema20_s = ema(close_s, 20)
@@ -267,8 +269,12 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         macd_line_pts: List[Dict[str, Any]] = []
         macd_sig_pts: List[Dict[str, Any]] = []
 
+        seen_ts: set[int] = set()
         for idx, row in work.iterrows():
             ts = int(pd.Timestamp(idx).timestamp())
+            if ts in seen_ts:
+                continue
+            seen_ts.add(ts)
             o = round(float(row["Open"]), dec)
             h = round(float(row["High"]), dec)
             l = round(float(row["Low"]), dec)
@@ -276,24 +282,30 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
             v = float(row.get("Volume", 0.0))
 
             candles.append({"time": ts, "open": o, "high": h, "low": l, "close": c, "volume": v})
-            ema20_pts.append({"time": ts, "value": round(float(ema20_s.loc[idx]), dec)})
-            ema50_pts.append({"time": ts, "value": round(float(ema50_s.loc[idx]), dec)})
-            ema200_pts.append({"time": ts, "value": round(float(ema200_s.loc[idx]), dec)})
+            e20 = float(ema20_s.loc[idx])
+            e50 = float(ema50_s.loc[idx])
+            e200 = float(ema200_s.loc[idx])
+            if np.isfinite(e20):
+                ema20_pts.append({"time": ts, "value": round(e20, dec)})
+            if np.isfinite(e50):
+                ema50_pts.append({"time": ts, "value": round(e50, dec)})
+            if np.isfinite(e200):
+                ema200_pts.append({"time": ts, "value": round(e200, dec)})
 
             bu = float(bb_u.loc[idx])
             bl = float(bb_l.loc[idx])
-            if not np.isnan(bu) and not np.isnan(bl):
+            if np.isfinite(bu) and np.isfinite(bl):
                 bb_upper_pts.append({"time": ts, "value": round(bu, dec)})
                 bb_lower_pts.append({"time": ts, "value": round(bl, dec)})
 
             rv = float(rsi_s.loc[idx])
-            if not np.isnan(rv):
+            if np.isfinite(rv):
                 rsi_pts.append({"time": ts, "value": round(rv, 2)})
 
             mh = float(macd_h.loc[idx])
             ml = float(macd_l.loc[idx])
             ms = float(macd_sig.loc[idx])
-            if not np.isnan(mh):
+            if np.isfinite(mh) and np.isfinite(ml) and np.isfinite(ms):
                 macd_hist_pts.append(
                     {
                         "time": ts,
