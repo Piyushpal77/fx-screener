@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
@@ -19,6 +20,7 @@ from fx_screener.engine.indicators import (
     bollinger_bands,
     compute_indicators,
     ema,
+    hma,
     macd,
     rsi,
 )
@@ -31,6 +33,7 @@ from fx_screener.engine.scorer import (
     score_volatility_pillar,
 )
 from fx_screener.engine.strength import get_pair_strength_pillar_score
+from fx_screener.engine.tracker import SignalTracker, TrackedSignal
 from fx_screener.universe import UNIVERSE_MAP
 
 
@@ -49,11 +52,13 @@ class WatchlistTogglePayload(BaseModel):
 
 
 class ScreenerWebState:
-    def __init__(self, config: AppConfig | None = None) -> None:
+    def __init__(self, config: AppConfig | None = None, tracker: SignalTracker | None = None) -> None:
         self.lock = threading.Lock()
         self.config = config or AppConfig.load()
+        self.tracker = tracker or SignalTracker()
         self.universe_data: Dict[str, Dict[str, pd.DataFrame]] = {}
         self.result: ScreenerResult | None = None
+        self.tracked_signals: List[TrackedSignal] = []
         self.last_updated: str = "-"
         self.refresh(force=False)
 
@@ -64,6 +69,9 @@ class ScreenerWebState:
             )
             self.result = analyze_universe(
                 self.universe_data, self.config, source=source
+            )
+            self.tracked_signals = self.tracker.sync_and_evaluate(
+                self.result.pairs, self.universe_data
             )
             self.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.last_refresh_epoch = datetime.now().timestamp()
@@ -80,6 +88,9 @@ class ScreenerWebState:
                 return
             self.result = analyze_universe(
                 self.universe_data, self.config, source=self.result.source
+            )
+            self.tracked_signals = self.tracker.sync_and_evaluate(
+                self.result.pairs, self.universe_data
             )
 
 
@@ -99,6 +110,11 @@ def _serialize_timeframe_score(tf_score: Any) -> Dict[str, Any]:
             "ema20": ind.ema20,
             "ema50": ind.ema50,
             "ema200": ind.ema200,
+            "hma9": ind.hma9,
+            "hma21": ind.hma21,
+            "hma_status": ind.hma_status,
+            "hma_bull_cross": ind.hma_bull_cross,
+            "hma_bear_cross": ind.hma_bear_cross,
             "adx14": round(ind.adx14, 1),
             "plus_di": round(ind.plus_di, 1),
             "minus_di": round(ind.minus_di, 1),
@@ -124,6 +140,10 @@ def _serialize_pair(p: PairAnalysis) -> Dict[str, Any]:
         "pip_size": p.spec.pip_size,
         "price": round(p.price, dec),
         "change_d1_pct": round(p.change_d1_pct, 2),
+        "raw_composite_score": round(p.raw_composite_score, 1),
+        "hma_h4_boost": round(p.hma_h4_boost, 1),
+        "hma_trigger": p.hma_trigger,
+        "is_fresh_hma_entry": p.is_fresh_hma_entry,
         "composite_score": round(p.composite_score, 1),
         "signal": p.signal,
         "confluence": p.confluence,
@@ -145,7 +165,9 @@ def _serialize_pair(p: PairAnalysis) -> Dict[str, Any]:
         "trade_plan": {
             "direction": tp.direction,
             "atr_timeframe": tp.atr_timeframe,
+            "stop_mode": tp.stop_mode,
             "entry_price": round(tp.entry_price, dec),
+            "hma21_h4_price": round(tp.hma21_h4_price, dec),
             "atr_value": round(tp.atr_value, dec),
             "atr_pips": round(tp.atr_pips, 1),
             "stop_loss_price": round(tp.stop_loss_price, dec),
@@ -170,12 +192,15 @@ def _serialize_pair(p: PairAnalysis) -> Dict[str, Any]:
     }
 
 
-def create_web_app(config: AppConfig | None = None) -> FastAPI:
+def create_web_app(
+    config: AppConfig | None = None,
+    tracker: SignalTracker | None = None,
+) -> FastAPI:
     app = FastAPI(
         title="FX & Precious Metals Multi-Factor Screener UI",
         version="1.1.0",
     )
-    state = ScreenerWebState(config=config)
+    state = ScreenerWebState(config=config, tracker=tracker)
     app.state.screener = state
 
     if STATIC_DIR.exists():
@@ -221,7 +246,20 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
             },
             "pairs": [_serialize_pair(p) for p in res.pairs],
             "alerts": res.alert_pairs,
+            "tracker": {
+                "summary": state.tracker.summary_stats(state.tracked_signals),
+                "signals": [asdict(s) for s in state.tracked_signals],
+            },
         }
+
+    @app.get("/api/tracker/csv")
+    def download_tracker_csv() -> FileResponse:
+        csv_file = state.tracker.export_csv(state.tracked_signals)
+        return FileResponse(
+            str(csv_file),
+            media_type="text/csv",
+            filename="strong_signals_tracker.csv",
+        )
 
     @app.get("/api/chart")
     def get_chart(
@@ -254,6 +292,8 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         ema20_s = ema(close_s, 20)
         ema50_s = ema(close_s, 50)
         ema200_s = ema(close_s, min(200, max(20, len(close_s))))
+        hma9_s = hma(close_s, 9)
+        hma21_s = hma(close_s, 21)
         bb_u, bb_m, bb_l, _ = bollinger_bands(close_s, 20, 2.0)
         rsi_s = rsi(close_s, 14)
         macd_l, macd_sig, macd_h = macd(close_s, 12, 26, 9)
@@ -262,6 +302,8 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         ema20_pts: List[Dict[str, Any]] = []
         ema50_pts: List[Dict[str, Any]] = []
         ema200_pts: List[Dict[str, Any]] = []
+        hma9_pts: List[Dict[str, Any]] = []
+        hma21_pts: List[Dict[str, Any]] = []
         bb_upper_pts: List[Dict[str, Any]] = []
         bb_lower_pts: List[Dict[str, Any]] = []
         rsi_pts: List[Dict[str, Any]] = []
@@ -285,12 +327,18 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
             e20 = float(ema20_s.loc[idx])
             e50 = float(ema50_s.loc[idx])
             e200 = float(ema200_s.loc[idx])
+            h9 = float(hma9_s.loc[idx])
+            h21 = float(hma21_s.loc[idx])
             if np.isfinite(e20):
                 ema20_pts.append({"time": ts, "value": round(e20, dec)})
             if np.isfinite(e50):
                 ema50_pts.append({"time": ts, "value": round(e50, dec)})
             if np.isfinite(e200):
                 ema200_pts.append({"time": ts, "value": round(e200, dec)})
+            if np.isfinite(h9):
+                hma9_pts.append({"time": ts, "value": round(h9, dec)})
+            if np.isfinite(h21):
+                hma21_pts.append({"time": ts, "value": round(h21, dec)})
 
             bu = float(bb_u.loc[idx])
             bl = float(bb_l.loc[idx])
@@ -346,6 +394,7 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
         )
 
         pair_obj = next((p for p in (state.result.pairs if state.result else []) if p.spec.pair == pair_key), None)
+        pair_tracked = [asdict(s) for s in state.tracked_signals if s.pair == pair_key]
 
         return {
             "pair": pair_key,
@@ -358,6 +407,9 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
                 "strength_score": round(s_score, 1),
                 "momentum_score": round(m_score, 1),
                 "volatility_score": round(v_score, 1),
+                "hma9": round(snap.hma9, dec),
+                "hma21": round(snap.hma21, dec),
+                "hma_status": snap.hma_status,
                 "rsi14": round(snap.rsi14, 1),
                 "adx14": round(snap.adx14, 1),
                 "atr14": round(snap.atr14, dec),
@@ -365,10 +417,13 @@ def create_web_app(config: AppConfig | None = None) -> FastAPI:
                 "vol_regime": snap.vol_regime,
             },
             "trade_plan": _serialize_pair(pair_obj)["trade_plan"] if pair_obj else None,
+            "tracked_signals": pair_tracked,
             "candles": candles,
             "ema20": ema20_pts,
             "ema50": ema50_pts,
             "ema200": ema200_pts,
+            "hma9": hma9_pts,
+            "hma21": hma21_pts,
             "bb_upper": bb_upper_pts,
             "bb_lower": bb_lower_pts,
             "rsi14": rsi_pts,

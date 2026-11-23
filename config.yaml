@@ -32,8 +32,4 @@ risk:
   - 1.5
   - 2.0
   - 3.0
-watchlist:
-- EUR/USD
-- GBP/JPY
-- XAU/USD
-- USD/CAD
+watchlist: []

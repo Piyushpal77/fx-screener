@@ -152,7 +152,7 @@
     }
 
     .risk-bar select {
-      width: 58px;
+      width: 92px;
     }
 
     .btn {
@@ -505,6 +505,53 @@
       border: 1px solid rgba(239, 68, 68, 0.45);
     }
 
+    .sig-buy-pullback {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fbbf24;
+      border: 1px dashed rgba(245, 158, 11, 0.5);
+    }
+
+    .sig-sell-pullback {
+      background: rgba(245, 158, 11, 0.16);
+      color: #fb923c;
+      border: 1px dashed rgba(249, 115, 22, 0.5);
+    }
+
+    .hma-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .hma-turn-bull {
+      background: rgba(16, 185, 129, 0.28);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.55);
+    }
+
+    .hma-bull {
+      background: rgba(16, 185, 129, 0.12);
+      color: #10b981;
+    }
+
+    .hma-turn-bear {
+      background: rgba(239, 68, 68, 0.28);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.55);
+    }
+
+    .hma-bear {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+    }
+
+    .hma-pullback {
+      background: rgba(245, 158, 11, 0.18);
+      color: #fbbf24;
+    }
+
     .conf-badge {
       font-size: 10.5px;
       font-weight: 600;
@@ -819,6 +866,49 @@
     .bull-text { color: var(--bull); }
     .bear-text { color: var(--bear); }
     .neutral-text { color: var(--text-muted); }
+
+    /* Green & Red Flashing Animations for New Long / Short Recommendations */
+    @keyframes flashGreenPulse {
+      0%, 100% {
+        background-color: rgba(16, 185, 129, 0.08);
+        box-shadow: inset 4px 0 0 #10b981, 0 0 0px rgba(16, 185, 129, 0);
+      }
+      50% {
+        background-color: rgba(16, 185, 129, 0.34);
+        box-shadow: inset 5px 0 0 #34d399, 0 0 18px rgba(16, 185, 129, 0.55);
+      }
+    }
+
+    @keyframes flashRedPulse {
+      0%, 100% {
+        background-color: rgba(239, 68, 68, 0.08);
+        box-shadow: inset 4px 0 0 #ef4444, 0 0 0px rgba(239, 68, 68, 0);
+      }
+      50% {
+        background-color: rgba(239, 68, 68, 0.34);
+        box-shadow: inset 5px 0 0 #fca5a5, 0 0 18px rgba(239, 68, 68, 0.55);
+      }
+    }
+
+    .flash-new-long {
+      animation: flashGreenPulse 1.35s ease-in-out infinite;
+    }
+
+    .flash-new-short {
+      animation: flashRedPulse 1.35s ease-in-out infinite;
+    }
+
+    /* Dotted Vertical Entry Date Line Overlay on Main Chart */
+    .entry-vline-overlay {
+      position: absolute;
+      top: 0;
+      height: 360px;
+      width: 0;
+      border-left: 2px dotted #38bdf8;
+      pointer-events: none;
+      z-index: 6;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -839,10 +929,11 @@
         <input type="number" id="inp-balance" value="10000" step="500" />
         <label>Risk (%)</label>
         <input type="number" id="inp-risk" value="1.0" step="0.25" style="width:58px;" />
-        <label>ATR TF</label>
+        <label>Stop Mode</label>
         <select id="sel-atr-tf">
-          <option value="D1">D1</option>
-          <option value="H4">H4</option>
+          <option value="D1">D1 ATR</option>
+          <option value="H4">H4 ATR</option>
+          <option value="H4_HMA">H4 HMA(21)</option>
         </select>
         <label>SL×ATR</label>
         <input type="number" id="inp-atr-mult" value="1.5" step="0.25" style="width:54px;" />
@@ -883,23 +974,28 @@
       <div class="filter-toolbar">
         <div class="filter-pills">
           <button class="pill active" data-filter="all" onclick="setFilterMode('all')">All (30)</button>
-          <button class="pill" data-filter="confluence" onclick="setFilterMode('confluence')">★ MTF Confluence</button>
-          <button class="pill" data-filter="strong" onclick="setFilterMode('strong')">Strong Signals (≥60)</button>
+          <button class="pill" data-filter="strong" onclick="setFilterMode('strong')">★ Strong Signals</button>
+          <button class="pill" data-filter="confluence" onclick="setFilterMode('confluence')">MTF Confluence</button>
           <button class="pill" data-filter="squeeze" onclick="setFilterMode('squeeze')">Squeeze / Breakout</button>
           <button class="pill" data-filter="watchlist" onclick="setFilterMode('watchlist')">★ Watchlist</button>
+          <button class="pill" data-filter="tracker" id="pill-tracker" onclick="switchLeftTab('tracker')" style="border-color:rgba(16,185,129,0.5); color:#34d399;">📊 Performance Log (0)</button>
         </div>
-        <div class="search-box">
+        <div class="search-box" id="screener-search-box">
           <input type="text" id="inp-search" placeholder="Filter pair / CCY (e.g. JPY, XAU)..." oninput="onSearchInput(this.value)" />
+        </div>
+        <div id="tracker-actions-box" style="display:none; align-items:center; gap:8px;">
+          <span class="mono" id="tracker-stats-pill" style="font-size:11px; color:var(--text-muted);"></span>
+          <a href="/api/tracker/csv" download="strong_signals_tracker.csv" class="btn" style="text-decoration:none; padding:4px 10px; font-size:11px; border-color:var(--bull); color:#34d399;">⬇ Export CSV Spreadsheet</a>
         </div>
       </div>
 
-      <div class="table-container">
+      <div class="table-container" id="screener-table-view">
         <table>
           <thead>
             <tr>
               <th style="width:28px;" onclick="setSort('watchlist')">★</th>
               <th onclick="setSort('pair')">Instrument</th>
-              <th onclick="setSort('price')" style="text-align:right;">Price</th>
+              <th onclick="setSort('price')" style="text-align:right;">4H Price</th>
               <th onclick="setSort('change')" style="text-align:right;">D1%</th>
               <th onclick="setSort('composite')" style="text-align:center;">Score ▼</th>
               <th onclick="setSort('composite')" style="text-align:center;">Signal</th>
@@ -913,6 +1009,24 @@
             </tr>
           </thead>
           <tbody id="screener-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="table-container" id="tracker-table-view" style="display:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>Trade Suggested</th>
+              <th>Date of Recommendation</th>
+              <th style="text-align:right;">Entry Price</th>
+              <th style="text-align:right;">Target (TP2)</th>
+              <th style="text-align:right;">Stop Loss</th>
+              <th style="text-align:right;">Current 4H</th>
+              <th>Outcome / Status</th>
+              <th>Date Reached</th>
+            </tr>
+          </thead>
+          <tbody id="tracker-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -929,12 +1043,13 @@
         <!-- Timeframe Switcher: Weekly to Hourly -->
         <div class="tf-switcher">
           <button class="tf-btn" data-tf="W1" onclick="switchChartTimeframe('W1')">W1 (Weekly)</button>
-          <button class="tf-btn active" data-tf="D1" onclick="switchChartTimeframe('D1')">D1 (Daily)</button>
-          <button class="tf-btn" data-tf="H4" onclick="switchChartTimeframe('H4')">H4 (4-Hour)</button>
+          <button class="tf-btn" data-tf="D1" onclick="switchChartTimeframe('D1')">D1 (Daily)</button>
+          <button class="tf-btn active" data-tf="H4" onclick="switchChartTimeframe('H4')">H4 (4-Hour)</button>
           <button class="tf-btn" data-tf="H1" onclick="switchChartTimeframe('H1')">H1 (Hourly)</button>
         </div>
 
         <div class="overlay-toggles">
+          <span class="toggle-chip active" id="tog-hma" onclick="toggleOverlay('hma')" title="Fast HMA(9) Cyan & Slow HMA(21) Amber">Hull HMA 9/21</span>
           <span class="toggle-chip active" id="tog-ema" onclick="toggleOverlay('ema')">EMA 20/50/200</span>
           <span class="toggle-chip active" id="tog-bb" onclick="toggleOverlay('bb')">Bollinger</span>
           <span class="toggle-chip active" id="tog-levels" onclick="toggleOverlay('levels')">SL/TP Lines</span>
@@ -943,6 +1058,7 @@
 
       <div class="charts-wrapper">
         <div id="main-chart"></div>
+        <div class="entry-vline-overlay" id="entry-vline"></div>
         <div class="subchart-header">
           <span class="mono" id="subchart-title">RSI (14) Oscillator & Momentum</span>
           <div style="display:flex; gap:6px;">
@@ -982,13 +1098,20 @@
     // Global State
     let screenerData = null;
     let selectedPair = "EUR/USD";
-    let selectedTimeframe = "D1";
+    let selectedTimeframe = "H4";
+    let activeLeftTab = "screener";
+    let selectedTrackedSignalId = null;
     let filterMode = "all";
     let searchQuery = "";
     let sortField = "composite";
     let sortAsc = false;
+    let acknowledgedPairs = new Set();
+    let currentEntryAnchorTime = null;
+    let currentEntryLabelText = "";
+    let currentEntryIsLong = true;
 
     // Chart Overlays State
+    let showHMA = true;
     let showEMA = true;
     let showBB = true;
     let showTradeLevels = true;
@@ -1028,11 +1151,16 @@
     // Lightweight Charts instances
     let mainChart = null;
     let candleSeries = null;
+    let hma9Series = null;
+    let hma21Series = null;
     let ema20Series = null;
     let ema50Series = null;
     let ema200Series = null;
     let bbUpperSeries = null;
     let bbLowerSeries = null;
+    let recEntryRaySeries = null;
+    let recTpRaySeries = null;
+    let recSlRaySeries = null;
     let activePriceLines = [];
 
     let subChart = null;
@@ -1080,12 +1208,20 @@
         wickDownColor: '#ef4444',
       });
 
-      ema20Series = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      hma9Series = mainChart.addLineSeries({ color: '#22d3ee', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      hma21Series = mainChart.addLineSeries({ color: '#f43f5e', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+
+      ema20Series = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       ema50Series = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       ema200Series = mainChart.addLineSeries({ color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
       bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+
+      // Forward-extending recommendation rays (from entry date forward until SL or TP is reached)
+      recEntryRaySeries = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 2, lineStyle: 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      recTpRaySeries = mainChart.addLineSeries({ color: '#10b981', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      recSlRaySeries = mainChart.addLineSeries({ color: '#ef4444', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
       subChart = LightweightCharts.createChart(subEl, {
         layout: {
@@ -1116,6 +1252,7 @@
       // Bidirectional visible logical range & crosshair synchronization between main chart and subchart
       let isSyncingRange = false;
       mainChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+        updateEntryVerticalLinePosition();
         if (isSyncingRange || !range) return;
         isSyncingRange = true;
         subChart.timeScale().setVisibleLogicalRange(range);
@@ -1126,6 +1263,12 @@
         isSyncingRange = true;
         mainChart.timeScale().setVisibleLogicalRange(range);
         isSyncingRange = false;
+      });
+
+      window.addEventListener("resize", () => {
+        mainChart.applyOptions({ width: mainEl.clientWidth });
+        subChart.applyOptions({ width: subEl.clientWidth });
+        updateEntryVerticalLinePosition();
       });
 
       mainChart.subscribeCrosshairMove((param) => {
@@ -1165,6 +1308,7 @@
 
       renderCurrencyStrength();
       renderScreenerTable();
+      renderTrackerTable();
 
       if (!screenerData.pairs.some(p => p.pair === selectedPair) && screenerData.pairs.length > 0) {
         selectedPair = screenerData.pairs[0].pair;
@@ -1216,7 +1360,7 @@
       if (filterMode === "confluence") {
         list = list.filter(p => p.confluence);
       } else if (filterMode === "strong") {
-        list = list.filter(p => Math.abs(p.composite_score) >= 60);
+        list = list.filter(p => p.signal === "STRONG BUY" || p.signal === "STRONG SELL");
       } else if (filterMode === "squeeze") {
         list = list.filter(p => p.vol_regime.includes("SQUEEZE") || p.vol_regime.includes("BREAKOUT"));
       } else if (filterMode === "watchlist") {
@@ -1226,7 +1370,7 @@
       if (searchQuery) {
         const q = searchQuery.toUpperCase();
         list = list.filter(p =>
-          p.pair.includes(q) || p.base === q || p.quote === q || p.signal.includes(q) || p.category.toUpperCase().includes(q)
+          p.pair.includes(q) || p.base === q || p.quote === q || p.signal.includes(q) || (p.hma_trigger || "").includes(q) || p.category.toUpperCase().includes(q)
         );
       }
 
@@ -1236,6 +1380,7 @@
           case "pair": va = a.pair; vb = b.pair; return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
           case "price": va = a.price; vb = b.price; break;
           case "change": va = a.change_d1_pct; vb = b.change_d1_pct; break;
+          case "hma_trigger": va = a.hma_h4_boost || 0; vb = b.hma_h4_boost || 0; break;
           case "h4": va = a.h4.total_score; vb = b.h4.total_score; break;
           case "d1": va = a.d1.total_score; vb = b.d1.total_score; break;
           case "w1": va = a.w1.total_score; vb = b.w1.total_score; break;
@@ -1257,10 +1402,38 @@
 
     function getSignalClass(signal) {
       if (signal === "STRONG BUY") return "sig-strong-buy";
+      if (signal === "BUY (PULLBACK)") return "sig-buy-pullback";
       if (signal === "BUY") return "sig-buy";
       if (signal === "STRONG SELL") return "sig-strong-sell";
+      if (signal === "SELL (PULLBACK)") return "sig-sell-pullback";
       if (signal === "SELL") return "sig-sell";
       return "sig-neutral";
+    }
+
+    function getHmaTriggerClass(trigger) {
+      if (!trigger) return "conf-mixed";
+      if (trigger.includes("TURN BULL")) return "hma-turn-bull";
+      if (trigger.includes("PULLBACK")) return "hma-pullback";
+      if (trigger.includes("BULL") || trigger.includes("RECOVER")) return "hma-bull";
+      if (trigger.includes("TURN BEAR")) return "hma-turn-bear";
+      if (trigger.includes("BEAR")) return "hma-bear";
+      return "conf-mixed";
+    }
+
+    function isPairFlashingNewEntry(p) {
+      if (!p) return false;
+      // 1. Must currently be a STRONG BUY or STRONG SELL
+      if (p.signal !== "STRONG BUY" && p.signal !== "STRONG SELL") return false;
+      // 2. Must be a fresh H4 Hull Pullback Resumption Turn on the current 4H candle
+      if (!p.is_fresh_hma_entry) return false;
+      // 3. Stop flashing once the user clicks the row to inspect it
+      if (acknowledgedPairs.has(p.pair)) return false;
+      return true;
+    }
+
+    async function focusFlashedRecommendation(sigId, pair) {
+      acknowledgedPairs.add(pair);
+      await selectTrackedSignal(sigId, pair);
     }
 
     function renderScreenerTable() {
@@ -1269,13 +1442,17 @@
 
       tbody.innerHTML = rows.map(p => {
         const isSel = p.pair === selectedPair ? "selected" : "";
+        const shouldFlash = isPairFlashingNewEntry(p);
+        const flashClass = shouldFlash
+          ? (p.signal === "STRONG BUY" ? "flash-new-long" : "flash-new-short")
+          : "";
         const starClass = p.is_watchlist ? "starred" : "";
         const chgClass = p.change_d1_pct >= 0 ? "bull-text" : "bear-text";
         const confClass = p.confluence_label.includes("BULL") ? "conf-bull" : (p.confluence_label.includes("BEAR") ? "conf-bear" : "conf-mixed");
         const regClass = p.vol_regime.includes("SQUEEZE") ? "reg-squeeze" : (p.vol_regime.includes("BREAKOUT") ? "reg-breakout" : "reg-normal");
 
         return `
-          <tr class="${isSel}" onclick="selectPair('${p.pair}')">
+          <tr class="${isSel} ${flashClass}" onclick="selectPair('${p.pair}')">
             <td onclick="event.stopPropagation(); toggleWatchlist('${p.pair}')">
               <span class="star-btn ${starClass}">★</span>
             </td>
@@ -1301,9 +1478,111 @@
       }).join("");
     }
 
+    function renderTrackerTable() {
+      if (!screenerData || !screenerData.tracker) return;
+      const summary = screenerData.tracker.summary;
+      const signals = screenerData.tracker.signals || [];
+
+      const pillBtn = document.getElementById("pill-tracker");
+      if (pillBtn) {
+        pillBtn.textContent = `📊 Performance Log (${summary.total_tracked})`;
+      }
+
+      const statsEl = document.getElementById("tracker-stats-pill");
+      if (statsEl) {
+        statsEl.innerHTML =
+          `Active: <b>${summary.active_count}</b> &nbsp;|&nbsp; ` +
+          `TP Achieved: <b class="bull-text">${summary.win_count}</b> &nbsp;|&nbsp; ` +
+          `SL Reached: <b class="bear-text">${summary.loss_count}</b> &nbsp;|&nbsp; ` +
+          `Win Rate: <b>${summary.win_rate_pct}%</b>`;
+      }
+
+      const tbody = document.getElementById("tracker-tbody");
+      if (!tbody) return;
+      if (signals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">No Strong Signals recorded yet. Strong Buy (≥60) and Strong Sell (≤-60) recommendations are automatically logged here and in <b>strong_signals_tracker.csv</b>.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = signals.map(s => {
+        const pairMeta = screenerData.pairs.find(p => p.pair === s.pair);
+        const dec = pairMeta ? pairMeta.decimals : 5;
+        const isSel = (s.pair === selectedPair && s.id === selectedTrackedSignalId) ? "selected" : "";
+        const isFreshBar = (s.status === "ACTIVE") && (s.bars_elapsed_h4 === 0) && isPairFlashingNewEntry(pairMeta);
+        const flashClass = isFreshBar ? (s.direction === "LONG" ? "flash-new-long" : "flash-new-short") : "";
+
+        let outcomeBadge = "";
+        if (s.status === "WIN_TP2") {
+          outcomeBadge = `<span class="signal-badge sig-strong-buy">★ Take Profit Achieved (WIN)</span>`;
+        } else if (s.status === "LOSS_SL") {
+          outcomeBadge = `<span class="signal-badge sig-strong-sell">✖ Stop Loss Reached (LOSS)</span>`;
+        } else if (s.status === "TP1_HIT") {
+          outcomeBadge = `<span class="signal-badge sig-buy">✓ TP1 Reached (Tracking to Target)</span>`;
+        } else {
+          outcomeBadge = `<span class="hma-badge hma-pullback">● In Progress (Tracking 4H)</span>`;
+        }
+
+        const curOrExit = (s.status === "WIN_TP2" || s.status === "LOSS_SL") ? s.exit_price : s.current_h4_price;
+
+        return `
+          <tr class="${isSel} ${flashClass}" onclick="focusFlashedRecommendation(${s.id}, '${s.pair}')">
+            <td>
+              <span class="pair-symbol">${s.pair}</span>
+              <span class="signal-badge ${getSignalClass(s.signal_type)}" style="margin-left:6px;">${s.signal_type} (${s.direction})</span>
+            </td>
+            <td class="mono">${s.entry_time}</td>
+            <td class="mono" style="text-align:right; font-weight:700;">${s.entry_price.toFixed(dec)}</td>
+            <td class="mono bull-text" style="text-align:right; font-weight:700;">${s.tp2_price.toFixed(dec)}</td>
+            <td class="mono bear-text" style="text-align:right; font-weight:700;">${s.stop_loss_price.toFixed(dec)}</td>
+            <td class="mono" style="text-align:right; font-weight:600;">${curOrExit.toFixed(dec)}</td>
+            <td>${outcomeBadge}</td>
+            <td class="mono" style="color:var(--text-muted);">${s.exit_time || "-"}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function selectTrackedSignal(sigId, pair) {
+      selectedTrackedSignalId = sigId;
+      selectedPair = pair;
+      selectedTimeframe = "H4";
+      document.querySelectorAll(".tf-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tf === "H4");
+      });
+      renderTrackerTable();
+      await loadPairChart(selectedPair, "H4");
+    }
+
+    function switchLeftTab(tab) {
+      activeLeftTab = tab;
+      const scrView = document.getElementById("screener-table-view");
+      const trkView = document.getElementById("tracker-table-view");
+      const searchBox = document.getElementById("screener-search-box");
+      const actBox = document.getElementById("tracker-actions-box");
+
+      if (tab === "tracker") {
+        scrView.style.display = "none";
+        trkView.style.display = "block";
+        searchBox.style.display = "none";
+        actBox.style.display = "flex";
+        document.querySelectorAll(".filter-pills .pill").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.filter === "tracker");
+        });
+        renderTrackerTable();
+      } else {
+        scrView.style.display = "block";
+        trkView.style.display = "none";
+        searchBox.style.display = "flex";
+        actBox.style.display = "none";
+      }
+    }
+
     async function selectPair(pair) {
       selectedPair = pair;
+      selectedTrackedSignalId = null;
+      acknowledgedPairs.add(pair);
       renderScreenerTable();
+      renderTrackerTable();
       await loadPairChart(selectedPair, selectedTimeframe);
     }
 
@@ -1337,10 +1616,14 @@
       });
       activePriceLines = [];
 
-      candleSeries.applyOptions({
-        priceFormat: { type: 'price', precision: dec, minMove: Math.pow(10, -dec) }
+      const pFmt = { type: 'price', precision: dec, minMove: Math.pow(10, -dec) };
+      [candleSeries, hma9Series, hma21Series, ema20Series, ema50Series, ema200Series, bbUpperSeries, bbLowerSeries, recEntryRaySeries, recTpRaySeries, recSlRaySeries].forEach(s => {
+        if (s) s.applyOptions({ priceFormat: pFmt });
       });
       candleSeries.setData(data.candles || []);
+
+      hma9Series.setData(showHMA ? (data.hma9 || []) : []);
+      hma21Series.setData(showHMA ? (data.hma21 || []) : []);
 
       ema20Series.setData(showEMA ? (data.ema20 || []) : []);
       ema50Series.setData(showEMA ? (data.ema50 || []) : []);
@@ -1349,7 +1632,8 @@
       bbUpperSeries.setData(showBB ? (data.bb_upper || []) : []);
       bbLowerSeries.setData(showBB ? (data.bb_lower || []) : []);
 
-      drawTradeLevelLines(data.trade_plan);
+      drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
+      drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
       renderSubchartData(data);
 
       // Reset both X (time) and Y (price) scales and lock subchart to exact mainChart logical range
@@ -1363,17 +1647,111 @@
       if (mainRange) {
         subChart.timeScale().setVisibleLogicalRange(mainRange);
       }
+      setTimeout(updateEntryVerticalLinePosition, 30);
 
       if (pairMeta) {
         renderInspectorPanels(pairMeta, data);
       }
     }
 
-    function drawTradeLevelLines(tp) {
-      activePriceLines.forEach(line => candleSeries.removePriceLine(line));
-      activePriceLines = [];
+    function updateEntryVerticalLinePosition() {
+      const vlineEl = document.getElementById("entry-vline");
+      const mainEl = document.getElementById("main-chart");
+      if (!vlineEl || !mainChart || !showTradeLevels || !currentEntryAnchorTime) {
+        if (vlineEl) vlineEl.style.display = "none";
+        return;
+      }
 
-      if (!showTradeLevels || !tp) return;
+      const x = mainChart.timeScale().timeToCoordinate(currentEntryAnchorTime);
+      const chartWidth = mainEl ? mainEl.clientWidth - 78 : 800;
+      if (x === null || x < 4 || x > chartWidth) {
+        vlineEl.style.display = "none";
+        return;
+      }
+
+      const borderColor = currentEntryIsLong ? "#10b981" : "#ef4444";
+      vlineEl.style.borderLeftColor = borderColor;
+      vlineEl.style.left = `${Math.round(x)}px`;
+      vlineEl.style.display = "block";
+    }
+
+    function drawTradeLevelLines(tp, trackedSignals, candles, dec) {
+      activePriceLines.forEach(line => {
+        try { candleSeries.removePriceLine(line); } catch (e) {}
+      });
+      activePriceLines = [];
+      if (recEntryRaySeries) recEntryRaySeries.setData([]);
+      if (recTpRaySeries) recTpRaySeries.setData([]);
+      if (recSlRaySeries) recSlRaySeries.setData([]);
+      currentEntryAnchorTime = null;
+
+      if (!showTradeLevels) {
+        updateEntryVerticalLinePosition();
+        return;
+      }
+
+      // Use an explicitly clicked historical tracked trade if selected, otherwise only an ACTIVE tracked trade
+      let activeSig = null;
+      if (trackedSignals && trackedSignals.length > 0) {
+        if (selectedTrackedSignalId !== null) {
+          activeSig = trackedSignals.find(s => s.id === selectedTrackedSignalId) || null;
+        }
+        if (!activeSig) {
+          activeSig = trackedSignals.find(s => s.status === "ACTIVE" || s.status === "TP1_HIT") || null;
+        }
+      }
+
+      if (activeSig && candles && candles.length > 0) {
+        const entryBarTime = snapTimestampToCandle(candles, activeSig.entry_ts);
+        const isClosed = (activeSig.status === "WIN_TP2" || activeSig.status === "LOSS_SL") && activeSig.exit_ts > 0;
+        const endBarTime = isClosed
+          ? snapTimestampToCandle(candles, activeSig.exit_ts)
+          : candles[candles.length - 1].time;
+
+        if (entryBarTime) {
+          currentEntryAnchorTime = entryBarTime;
+          currentEntryIsLong = activeSig.direction === "LONG";
+
+          // Build forward-going rays from the entry candle forward to current 4H bar (or exit bar if SL/TP hit)
+          const entryPts = [];
+          const tpPts = [];
+          const slPts = [];
+          for (const c of candles) {
+            if (c.time >= entryBarTime && c.time <= endBarTime) {
+              entryPts.push({ time: c.time, value: activeSig.entry_price });
+              tpPts.push({ time: c.time, value: activeSig.tp2_price });
+              slPts.push({ time: c.time, value: activeSig.stop_loss_price });
+            }
+          }
+          recEntryRaySeries.setData(entryPts);
+          recTpRaySeries.setData(tpPts);
+          recSlRaySeries.setData(slPts);
+        }
+
+        // Also attach right-axis price labels directly on candleSeries so values match the Y-axis 1:1
+        const trackedLines = [
+          { price: activeSig.entry_price, color: '#38bdf8', title: `REC ENTRY`, lineStyle: 0 },
+          { price: activeSig.stop_loss_price, color: '#ef4444', title: `SL`, lineStyle: 2 },
+          { price: activeSig.tp2_price, color: '#10b981', title: `TARGET (TP)`, lineStyle: 2 },
+        ];
+        trackedLines.forEach(cfg => {
+          const pl = candleSeries.createPriceLine({
+            price: cfg.price,
+            color: cfg.color,
+            lineWidth: 1,
+            lineStyle: cfg.lineStyle,
+            axisLabelVisible: true,
+            title: cfg.title,
+          });
+          activePriceLines.push(pl);
+        });
+
+        updateEntryVerticalLinePosition();
+        return;
+      }
+
+      updateEntryVerticalLinePosition();
+      if (!tp) return;
 
       const lines = [
         { price: tp.entry_price, color: '#38bdf8', title: `ENTRY (${tp.direction})`, lineStyle: 0 },
@@ -1393,6 +1771,57 @@
         });
         activePriceLines.push(pl);
       });
+    }
+
+    function snapTimestampToCandle(candles, targetTs) {
+      if (!candles || candles.length === 0 || !targetTs) return null;
+      let bestTime = candles[candles.length - 1].time;
+      let bestDiff = Infinity;
+      for (const c of candles) {
+        const d = Math.abs(c.time - targetTs);
+        if (d < bestDiff) {
+          bestDiff = d;
+          bestTime = c.time;
+        }
+      }
+      return bestTime;
+    }
+
+    function drawTrackedSignalMarkers(candles, trackedSignals, dec) {
+      if (!candleSeries) return;
+      if (!showTradeLevels || !trackedSignals || trackedSignals.length === 0 || !candles || candles.length === 0) {
+        candleSeries.setMarkers([]);
+        return;
+      }
+
+      const markers = [];
+      trackedSignals.forEach(sig => {
+        const entryBarTime = snapTimestampToCandle(candles, sig.entry_ts);
+        if (entryBarTime) {
+          const isLong = sig.direction === "LONG";
+          markers.push({
+            time: entryBarTime,
+            position: isLong ? "belowBar" : "aboveBar",
+            color: isLong ? "#10b981" : "#ef4444",
+            shape: isLong ? "arrowUp" : "arrowDown",
+          });
+        }
+        if ((sig.status === "WIN_TP2" || sig.status === "LOSS_SL") && sig.exit_ts > 0) {
+          const exitBarTime = snapTimestampToCandle(candles, sig.exit_ts);
+          if (exitBarTime) {
+            const isWin = sig.status === "WIN_TP2";
+            markers.push({
+              time: exitBarTime,
+              position: isWin ? "aboveBar" : "belowBar",
+              color: isWin ? "#10b981" : "#ef4444",
+              shape: "circle",
+            });
+          }
+        }
+      });
+
+      markers.sort((a, b) => a.time - b.time);
+      candleSeries.setMarkers(markers);
     }
 
     function renderSubchartData(data) {
@@ -1427,7 +1856,7 @@
         `${chartData.timeframe} Score: ${formatScoreCell(tfs.total_score)} &nbsp;|&nbsp; MTF: ${formatScoreCell(pairMeta.composite_score)}`;
 
       const pillars = [
-        { name: "Trend (EMA 20/50/200 + ADX)", weight: "35%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
+        { name: "Trend (HMA 9/21 + EMA 50/200 + ADX)", weight: "35%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
         { name: "G8 Currency Strength Diff", weight: "25%", val: pairMeta.pillars.strength, tfVal: tfs.strength_score },
         { name: "Momentum (RSI 14 + MACD)", weight: "25%", val: pairMeta.pillars.momentum, tfVal: tfs.momentum_score },
         { name: "Volatility (BB + ATR Regime)", weight: "15%", val: pairMeta.pillars.volatility, tfVal: tfs.volatility_score },
@@ -1477,16 +1906,19 @@
         </tbody>
       `;
 
-      // Render ATR Trade Ticket
+      // Render ATR / H4 HMA(21) Trade Ticket
       const tp = pairMeta.trade_plan;
       const dec = pairMeta.decimals;
       const dirColor = tp.direction === "LONG" ? "var(--bull)" : "var(--bear)";
+      const stopLabel = tp.stop_mode === "H4_HMA21_TRAIL"
+        ? `H4 HMA(21) Trail (${tp.hma21_h4_price.toFixed(dec)})`
+        : `Stop Loss (${screenerData.risk_config.sl_atr_multiplier}× ${tp.atr_timeframe} ATR)`;
       document.getElementById("ticket-direction-badge").innerHTML =
-        `<span style="color:${dirColor}; font-weight:800;">${tp.direction} (${tp.atr_timeframe} ATR: ${tp.atr_pips}p)</span>`;
+        `<span style="color:${dirColor}; font-weight:800;">${tp.direction} (${tp.stop_mode === "H4_HMA21_TRAIL" ? "H4 HMA21" : tp.atr_timeframe + " ATR"}: ${tp.atr_pips}p)</span>`;
 
       document.getElementById("ticket-main-grid").innerHTML = `
         <div class="ticket-box">
-          <div class="ticket-label">Entry Reference</div>
+          <div class="ticket-label">4H Entry Reference (${pairMeta.hma_trigger})</div>
           <div class="ticket-val">${tp.entry_price.toFixed(dec)}</div>
         </div>
         <div class="ticket-box">
@@ -1494,7 +1926,7 @@
           <div class="ticket-val" style="color:var(--accent)">${tp.standard_lots.toFixed(2)} Lots <span style="font-size:11px; color:var(--text-muted)">(${tp.units.toLocaleString()} u)</span></div>
         </div>
         <div class="ticket-box">
-          <div class="ticket-label">Stop Loss (${screenerData.risk_config.sl_atr_multiplier}× ATR)</div>
+          <div class="ticket-label">${stopLabel}</div>
           <div class="ticket-val bear-text">${tp.stop_loss_price.toFixed(dec)} <span style="font-size:11px;">(-${tp.stop_loss_pips}p)</span></div>
         </div>
         <div class="ticket-box">
@@ -1525,6 +1957,7 @@
     // UI Interaction Handlers
     function setFilterMode(mode) {
       filterMode = mode;
+      switchLeftTab("screener");
       document.querySelectorAll(".filter-pills .pill").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.filter === mode);
       });
@@ -1561,7 +1994,10 @@
     }
 
     function toggleOverlay(kind) {
-      if (kind === "ema") {
+      if (kind === "hma") {
+        showHMA = !showHMA;
+        document.getElementById("tog-hma").classList.toggle("active", showHMA);
+      } else if (kind === "ema") {
         showEMA = !showEMA;
         document.getElementById("tog-ema").classList.toggle("active", showEMA);
       } else if (kind === "bb") {
@@ -1572,12 +2008,15 @@
         document.getElementById("tog-levels").classList.toggle("active", showTradeLevels);
       }
       if (lastChartPayload) {
+        hma9Series.setData(showHMA ? (lastChartPayload.hma9 || []) : []);
+        hma21Series.setData(showHMA ? (lastChartPayload.hma21 || []) : []);
         ema20Series.setData(showEMA ? lastChartPayload.ema20 : []);
         ema50Series.setData(showEMA ? lastChartPayload.ema50 : []);
         ema200Series.setData(showEMA ? lastChartPayload.ema200 : []);
         bbUpperSeries.setData(showBB ? lastChartPayload.bb_upper : []);
         bbLowerSeries.setData(showBB ? lastChartPayload.bb_lower : []);
-        drawTradeLevelLines(lastChartPayload.trade_plan);
+        drawTradeLevelLines(lastChartPayload.trade_plan, lastChartPayload.tracked_signals, lastChartPayload.candles || [], lastChartPayload.decimals);
+        drawTrackedSignalMarkers(lastChartPayload.candles || [], lastChartPayload.tracked_signals || [], lastChartPayload.decimals);
       }
     }
 
@@ -1631,6 +2070,7 @@
             `${screenerData.source} • ${screenerData.last_updated.split(" ")[1] || screenerData.last_updated}`;
           renderCurrencyStrength();
           renderScreenerTable();
+          renderTrackerTable();
           await loadPairChart(selectedPair, selectedTimeframe);
         }
       } finally {

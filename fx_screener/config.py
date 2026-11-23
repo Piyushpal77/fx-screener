@@ -41,7 +41,7 @@ class ThresholdsConfig:
 class RiskConfig:
     account_balance_usd: float = 10000.0
     risk_percent: float = 1.0
-    atr_timeframe: str = "D1"  # "D1" or "H4"
+    atr_timeframe: str = "D1"  # "D1", "H4", or "H4_HMA"
     sl_atr_multiplier: float = 1.5
     tp_r_multiples: List[float] = field(default_factory=lambda: [1.5, 2.0, 3.0])
 

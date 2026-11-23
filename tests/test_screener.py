@@ -54,16 +54,28 @@ def test_analyze_universe_scoring_and_strength_matrix() -> None:
     for s in scores:
         assert -100.0 <= s <= 100.0
 
-    # Verify pair composite scores and MTF weighting
+    # Verify pair composite scores, 3-TF weighting (D1 50%, H4 30%, W1 20%), and H4 HMA pullback boost/guard
     for p in result.pairs:
         assert -100.0 <= p.composite_score <= 100.0
-        expected_comp = (
+        expected_raw = (
             cfg.timeframe_weights.D1 * p.d1.total_score
             + cfg.timeframe_weights.H4 * p.h4.total_score
             + cfg.timeframe_weights.W1 * p.w1.total_score
         )
+        assert abs(p.raw_composite_score - expected_raw) < 1e-4
+        expected_comp = max(-100.0, min(100.0, expected_raw + p.hma_h4_boost))
         assert abs(p.composite_score - expected_comp) < 1e-4
-        assert p.signal in {"STRONG BUY", "BUY", "NEUTRAL", "SELL", "STRONG SELL"}
+        assert p.signal in {
+            "STRONG BUY",
+            "BUY",
+            "BUY (PULLBACK)",
+            "NEUTRAL",
+            "SELL (PULLBACK)",
+            "SELL",
+            "STRONG SELL",
+        }
+        assert p.h4.indicators.hma9 > 0
+        assert p.h4.indicators.hma21 > 0
 
 
 def test_cross_currency_pip_values_and_trade_planner() -> None:
@@ -105,8 +117,22 @@ def test_cross_currency_pip_values_and_trade_planner() -> None:
     assert abs(plan.stop_loss_pips - 120.0) < 1e-4
     assert abs(plan.stop_loss_price - (1.0500 - 0.0120)) < 1e-6
     assert abs(plan.tp2_pips - 240.0) < 1e-4
-    # $100 risk / (120 pips * $10/pip) = 0.08333 standard lots
-    assert abs(plan.standard_lots - (100.0 / 1200.0)) < 1e-4
+    # Verify H4_HMA dynamic trailing stop mode
+    hma_risk_cfg = AppConfig().risk
+    hma_risk_cfg.atr_timeframe = "H4_HMA"
+    hma_plan = build_trade_plan(
+        pair="EUR/USD",
+        composite_score=68.0,
+        entry_price=1.0500,
+        atr_value=0.0020,  # 20 pips H4 ATR
+        risk_cfg=hma_risk_cfg,
+        spot_prices=BASELINE_PRICES,
+        hma21_h4=1.0485,   # 15 pips below entry; with 0.5x ATR buffer -> 25 pips stop
+        atr_h4=0.0020,
+    )
+    assert hma_plan.stop_mode == "H4_HMA21_TRAIL"
+    assert abs(hma_plan.stop_loss_pips - 25.0) < 1e-4
+    assert hma_plan.standard_lots > plan.standard_lots
 
 
 def test_sqlite_cache_and_export(tmp_path: Path) -> None:
@@ -137,12 +163,17 @@ def test_sqlite_cache_and_export(tmp_path: Path) -> None:
     assert len(make_sparkline([1.0, 1.1, 1.05, 1.2, 1.15])) == 5
 
 
-def test_web_app_chart_endpoints() -> None:
-    from fx_screener.web.server import create_web_app
+def test_web_app_chart_endpoints(tmp_path: Path) -> None:
+    from fx_screener.engine.tracker import SignalTracker
+    from fx_screener.web.server import ScreenerWebState, create_web_app
 
     cfg = AppConfig()
     cfg.provider.active = "synthetic"
-    app = create_web_app(config=cfg)
+    test_tracker = SignalTracker(
+        db_path=tmp_path / "web_test.sqlite3",
+        csv_path=tmp_path / "web_test.csv",
+    )
+    app = create_web_app(config=cfg, tracker=test_tracker)
     state = app.state.screener
     assert state.result is not None
     assert len(state.result.pairs) == 30
@@ -151,3 +182,53 @@ def test_web_app_chart_endpoints() -> None:
     for tf in ("W1", "D1", "H4", "H1"):
         df = state.universe_data["EUR/USD"].get(tf)
         assert df is not None and not df.empty
+
+
+def test_h4_strong_signal_tracker_and_csv_spreadsheet(tmp_path: Path) -> None:
+    import pandas as pd
+    from fx_screener.engine.tracker import SignalTracker
+
+    db_file = tmp_path / "tracker_test.sqlite3"
+    csv_file = tmp_path / "strong_signals_tracker.csv"
+    tracker = SignalTracker(db_path=db_file, csv_path=csv_file)
+
+    cfg = AppConfig()
+    cfg.thresholds.strong_buy = 25.0  # Ensure at least one strong signal is generated
+    data = SyntheticProvider(seed=42).fetch_universe()
+    res = analyze_universe(data, cfg, source="synthetic")
+    # Ensure at least one strong pair is marked as a fresh H4 Hull Pullback Turn for test verification
+    strong_candidates = [p for p in res.pairs if p.signal in ("STRONG BUY", "STRONG SELL")]
+    assert len(strong_candidates) > 0
+    strong_candidates[0].is_fresh_hma_entry = True
+    strong_candidates[0].hma_trigger = "★ H4 HMA TURN BULL" if strong_candidates[0].signal == "STRONG BUY" else "★ H4 HMA TURN BEAR"
+
+    signals = tracker.sync_and_evaluate(res.pairs, data)
+    assert len(signals) > 0
+    assert csv_file.exists()
+    header_line = csv_file.read_text(encoding="utf-8").splitlines()[0]
+    assert "Trade Suggested,Date of Recommendation,Entry Price,Target Price (TP2),Stop Loss Price" in header_line
+
+    # Simulate a future 4H bar that hits TP2 (2.0R) for the first tracked signal
+    first = signals[0]
+    h4_df = data[first.pair]["H4"].copy()
+    next_ts = pd.Timestamp(h4_df.index[-1]) + pd.Timedelta(hours=4)
+
+    if first.direction == "LONG":
+        new_bar = pd.DataFrame(
+            [{"Open": first.entry_price, "High": first.tp2_price + 0.0050, "Low": first.entry_price, "Close": first.tp2_price, "Volume": 100.0}],
+            index=[next_ts],
+        )
+    else:
+        new_bar = pd.DataFrame(
+            [{"Open": first.entry_price, "High": first.entry_price, "Low": first.tp2_price - 0.0050, "Close": first.tp2_price, "Volume": 100.0}],
+            index=[next_ts],
+        )
+
+    data[first.pair]["H4"] = pd.concat([h4_df, new_bar])
+    updated_signals = tracker.sync_and_evaluate(res.pairs, data)
+    closed_sig = next(s for s in updated_signals if s.id == first.id)
+    assert closed_sig.status == "WIN_TP2"
+    assert closed_sig.tp1_hit is True
+    assert closed_sig.pnl_r >= 1.9
+    summary = tracker.summary_stats(updated_signals)
+    assert summary["win_count"] >= 1

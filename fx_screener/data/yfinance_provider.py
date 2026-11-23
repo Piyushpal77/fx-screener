@@ -6,7 +6,11 @@ import logging
 from typing import Dict, List
 import pandas as pd
 
-from fx_screener.data.base import MarketDataProvider, resample_ohlcv
+from fx_screener.data.base import (
+    MarketDataProvider,
+    build_clean_daily_and_weekly_ohlcv,
+    resample_ohlcv,
+)
 from fx_screener.universe import ALL_PAIRS, UNIVERSE_MAP
 
 logger = logging.getLogger(__name__)
@@ -127,8 +131,7 @@ class YFinanceProvider(MarketDataProvider):
                     df_w1 = self._extract_ticker_df(fb_1wk, fb, True)
 
             df_h4 = resample_ohlcv(df_1h, "4h") if not df_1h.empty else pd.DataFrame()
-            if df_w1.empty and not df_d1.empty:
-                df_w1 = resample_ohlcv(df_d1, "1W")
+            df_d1, df_w1 = build_clean_daily_and_weekly_ohlcv(df_1h, df_d1, df_w1)
 
             if not df_h4.empty and not df_d1.empty and not df_w1.empty:
                 result[spec.pair] = {

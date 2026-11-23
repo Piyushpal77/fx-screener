@@ -9,6 +9,9 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 
+from fx_screener.data.base import build_clean_daily_and_weekly_ohlcv
+
+
 DEFAULT_CACHE_DB = Path(__file__).resolve().parent.parent.parent / ".fx_screener_cache.sqlite3"
 
 
@@ -158,9 +161,15 @@ class MarketDataCache:
                     df["ts"] = pd.to_datetime(df["ts"], utc=True)
                     df = df.set_index("ts")
                     result[pair][tf] = df
-        # Keep pairs that have at least H4, D1, W1
-        return {
-            p: tfs
-            for p, tfs in result.items()
-            if all(req in tfs for req in ("H4", "D1", "W1"))
-        }
+        # Keep pairs that have at least H4, D1, W1; synthesize H1 from H4 if legacy cache lacks H1
+        # and ensure D1/W1 bars have properly formed Open/Close bodies
+        valid: Dict[str, Dict[str, pd.DataFrame]] = {}
+        for p, tfs in result.items():
+            if all(req in tfs for req in ("H4", "D1", "W1")):
+                if "H1" not in tfs or tfs["H1"].empty:
+                    tfs["H1"] = tfs["H4"].copy()
+                tfs["D1"], tfs["W1"] = build_clean_daily_and_weekly_ohlcv(
+                    tfs.get("H1"), tfs.get("D1"), tfs.get("W1")
+                )
+                valid[p] = tfs
+        return valid

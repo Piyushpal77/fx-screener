@@ -1,8 +1,9 @@
-"""Vectorized technical indicators for the FX Screener (EMA, ADX, RSI, MACD, Bollinger, ATR)."""
+"""Vectorized technical indicators for the FX Screener (HMA, EMA, ADX, RSI, MACD, Bollinger, ATR)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import numpy as np
 import pandas as pd
 
@@ -16,6 +17,15 @@ class IndicatorSnapshot:
     ema50: float
     ema200: float
     ema20_slope_pct: float
+    hma9: float
+    hma21: float
+    hma9_prev: float
+    hma21_prev: float
+    hma9_slope_pct: float
+    hma21_slope_pct: float
+    hma_bull_cross: bool      # True if HMA(9) crossed above HMA(21) or turned bullish within last 2 bars
+    hma_bear_cross: bool      # True if HMA(9) crossed below HMA(21) or turned bearish within last 2 bars
+    hma_status: str           # "HMA TURN BULL" | "HMA BULL" | "HMA TURN BEAR" | "HMA BEAR" | "HMA FLAT"
     adx14: float
     plus_di: float
     minus_di: float
@@ -40,6 +50,31 @@ class IndicatorSnapshot:
 
 def ema(series: pd.Series, span: int) -> pd.Series:
     return series.ewm(span=span, adjust=False).mean()
+
+
+def wma(series: pd.Series, period: int) -> pd.Series:
+    """Vectorized Weighted Moving Average (WMA) with linear weights 1..period."""
+    p = max(1, int(period))
+    if p <= 1:
+        return series.astype(float).copy()
+    weights = np.arange(1, p + 1, dtype=float)
+    w_sum = weights.sum()
+    rolled = series.rolling(p, min_periods=1).apply(
+        lambda x: float(np.dot(x, np.arange(1, len(x) + 1, dtype=float)) / (len(x) * (len(x) + 1) / 2.0)),
+        raw=True,
+    )
+    return rolled
+
+
+def hma(series: pd.Series, period: int = 9) -> pd.Series:
+    """Hull Moving Average: HMA(n) = WMA(2 * WMA(n/2) - WMA(n), int(sqrt(n)))."""
+    p = max(2, int(period))
+    half_p = max(1, p // 2)
+    sqrt_p = max(1, int(math.isqrt(p)))
+    wma_half = wma(series, half_p)
+    wma_full = wma(series, p)
+    raw_hma = 2.0 * wma_half - wma_full
+    return wma(raw_hma, sqrt_p)
 
 
 def rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -133,6 +168,51 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorSnapshot:
     ema20_prev = float(ema20_s.iloc[-4]) if len(ema20_s) >= 4 else float(ema20_s.iloc[0])
     ema20_slope_pct = ((ema20_now - ema20_prev) / ema20_prev * 100.0) if ema20_prev else 0.0
 
+    # Hull Moving Averages: Fast HMA(9) and Slow HMA(21)
+    hma9_s = hma(close_s, 9)
+    hma21_s = hma(close_s, 21)
+    hma9_now = float(hma9_s.iloc[-1])
+    hma9_prev = float(hma9_s.iloc[-2]) if len(hma9_s) >= 2 else hma9_now
+    hma9_prev2 = float(hma9_s.iloc[-3]) if len(hma9_s) >= 3 else hma9_prev
+    hma21_now = float(hma21_s.iloc[-1])
+    hma21_prev = float(hma21_s.iloc[-2]) if len(hma21_s) >= 2 else hma21_now
+
+    hma9_slope_pct = ((hma9_now - hma9_prev) / hma9_prev * 100.0) if hma9_prev else 0.0
+    hma21_slope_pct = ((hma21_now - hma21_prev) / hma21_prev * 100.0) if hma21_prev else 0.0
+
+    # Detect fresh HMA(9)/HMA(21) crossover or HMA(9) pullback resumption turn
+    # A genuine bullish pullback turn requires either:
+    # 1. HMA(9) crossing above HMA(21) on the current bar, OR
+    # 2. Price / HMA(9) dipping into a pullback over the recent 3 bars (hma9_prev < hma9_prev2 or low dipped near/below HMA21)
+    #    and HMA(9) now hooking upward with Close >= HMA(9)
+    recent_lows = df["Low"].astype(float).iloc[-4:-1] if len(df) >= 4 else df["Low"].astype(float)
+    recent_highs = df["High"].astype(float).iloc[-4:-1] if len(df) >= 4 else df["High"].astype(float)
+    dipped_to_hma21 = bool((recent_lows <= hma21_now * 1.0015).any()) if len(recent_lows) > 0 else False
+    rallied_to_hma21 = bool((recent_highs >= hma21_now * 0.9985).any()) if len(recent_highs) > 0 else False
+
+    crossed_up = (hma9_now > hma21_now) and (hma9_prev <= hma21_prev)
+    turned_up = (hma9_now > hma9_prev) and ((hma9_prev < hma9_prev2) or dipped_to_hma21) and (close >= hma9_now)
+    hma_bull_cross = bool(crossed_up or turned_up)
+
+    crossed_down = (hma9_now < hma21_now) and (hma9_prev >= hma21_prev)
+    turned_down = (hma9_now < hma9_prev) and ((hma9_prev > hma9_prev2) or rallied_to_hma21) and (close <= hma9_now)
+    hma_bear_cross = bool(crossed_down or turned_down)
+
+    if hma_bull_cross and hma9_now >= hma21_now:
+        hma_status = "HMA TURN BULL"
+    elif hma_bear_cross and hma9_now <= hma21_now:
+        hma_status = "HMA TURN BEAR"
+    elif hma9_now > hma21_now and hma9_now >= hma9_prev:
+        hma_status = "HMA BULL"
+    elif hma9_now < hma21_now and hma9_now <= hma9_prev:
+        hma_status = "HMA BEAR"
+    elif hma9_now > hma9_prev:
+        hma_status = "HMA RECOVER"
+    elif hma9_now < hma9_prev:
+        hma_status = "HMA PULLBACK"
+    else:
+        hma_status = "HMA FLAT"
+
     adx_s, plus_di_s, minus_di_s = adx(df, 14)
     rsi_s = rsi(close_s, 14)
     macd_l, macd_sig, macd_h = macd(close_s, 12, 26, 9)
@@ -181,6 +261,15 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorSnapshot:
         ema50=float(ema50_s.iloc[-1]),
         ema200=float(ema200_s.iloc[-1]),
         ema20_slope_pct=ema20_slope_pct,
+        hma9=hma9_now,
+        hma21=hma21_now,
+        hma9_prev=hma9_prev,
+        hma21_prev=hma21_prev,
+        hma9_slope_pct=hma9_slope_pct,
+        hma21_slope_pct=hma21_slope_pct,
+        hma_bull_cross=hma_bull_cross,
+        hma_bear_cross=hma_bear_cross,
+        hma_status=hma_status,
         adx14=float(adx_s.iloc[-1]),
         plus_di=float(plus_di_s.iloc[-1]),
         minus_di=float(minus_di_s.iloc[-1]),

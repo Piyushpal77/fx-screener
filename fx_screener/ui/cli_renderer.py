@@ -75,11 +75,13 @@ def format_signal_badge(signal: str) -> Text:
     styles = {
         "STRONG BUY": "bold black on bright_green",
         "BUY": "bold bright_green",
+        "BUY (PULLBACK)": "bold yellow",
         "NEUTRAL": "dim white",
+        "SELL (PULLBACK)": "bold yellow",
         "SELL": "bold bright_red",
         "STRONG SELL": "bold white on red",
     }
-    return Text(f" {signal:^11} ", style=styles.get(signal, "white"))
+    return Text(f" {signal:^15} ", style=styles.get(signal, "white"))
 
 
 def filter_pairs(
@@ -89,10 +91,12 @@ def filter_pairs(
 ) -> List[PairAnalysis]:
     out = list(pairs)
     mode = (filter_mode or "all").lower()
-    if mode == "confluence":
+    if mode == "hma_turn":
+        out = [p for p in out if "TURN" in p.hma_trigger]
+    elif mode == "confluence":
         out = [p for p in out if p.confluence]
-    elif mode == "strong":
-        out = [p for p in out if abs(p.composite_score) >= 60.0]
+    if mode == "strong":
+        out = [p for p in out if p.signal in ("STRONG BUY", "STRONG SELL")]
     elif mode == "squeeze":
         out = [p for p in out if "SQUEEZE" in p.vol_regime or "BREAKOUT" in p.vol_regime]
     elif mode == "watchlist":
@@ -107,6 +111,7 @@ def filter_pairs(
             or q == p.spec.base.upper()
             or q == p.spec.quote.upper()
             or q in p.signal.upper()
+            or q in p.hma_trigger.upper()
         ]
     return out
 
@@ -240,6 +245,9 @@ def export_screener_results(
                 "price": round(p.price, p.spec.decimals),
                 "change_d1_pct": round(p.change_d1_pct, 3),
                 "composite_score": round(p.composite_score, 2),
+                "raw_composite_score": round(p.raw_composite_score, 2),
+                "hma_h4_boost": round(p.hma_h4_boost, 2),
+                "hma_trigger": p.hma_trigger,
                 "signal": p.signal,
                 "h4_score": round(p.h4.total_score, 2),
                 "d1_score": round(p.d1.total_score, 2),

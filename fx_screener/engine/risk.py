@@ -13,8 +13,10 @@ from fx_screener.universe import InstrumentSpec, UNIVERSE_MAP
 class TradePlan:
     pair: str
     direction: str             # "LONG" | "SHORT"
-    atr_timeframe: str         # "D1" | "H4"
+    atr_timeframe: str         # "D1" | "H4" | "H4_HMA"
+    stop_mode: str             # "ATR" | "H4_HMA21_TRAIL"
     entry_price: float
+    hma21_h4_price: float
     atr_value: float
     atr_pips: float
     stop_loss_price: float
@@ -81,14 +83,36 @@ def build_trade_plan(
     atr_value: float,
     risk_cfg: RiskConfig,
     spot_prices: Dict[str, float],
+    hma21_h4: float | None = None,
+    atr_h4: float | None = None,
 ) -> TradePlan:
-    """Generate an actionable ATR Stop-Loss, 1.5R/2R/3R Take-Profit, and USD Lot Size plan."""
+    """Generate an actionable ATR or H4 HMA(21) Trail Stop-Loss, 1.5R/2R/3R Take-Profit, and USD Lot Size plan."""
     spec = UNIVERSE_MAP[pair]
     direction = "LONG" if composite_score >= 0 else "SHORT"
     sign = 1.0 if direction == "LONG" else -1.0
 
     atr_pips = (atr_value / spec.pip_size) if spec.pip_size > 0 else 0.0
-    sl_distance = atr_value * risk_cfg.sl_atr_multiplier
+    hma_ref = hma21_h4 if (hma21_h4 is not None and hma21_h4 > 0) else entry_price
+    h4_atr_ref = atr_h4 if (atr_h4 is not None and atr_h4 > 0) else atr_value
+
+    tf_mode = risk_cfg.atr_timeframe.upper()
+    stop_mode = "ATR"
+
+    if tf_mode == "H4_HMA" and hma21_h4 is not None and hma21_h4 > 0:
+        # Dynamic H4 HMA(21) Trailing Stop with 0.5x H4 ATR breathing buffer,
+        # bounded between [0.75x H4 ATR, sl_atr_multiplier * H4 ATR] to prevent ultra-tight whipsaws
+        raw_hma_stop = hma21_h4 - sign * (0.5 * h4_atr_ref)
+        raw_dist = sign * (entry_price - raw_hma_stop)
+        min_dist = 0.75 * h4_atr_ref
+        max_dist = max(min_dist, risk_cfg.sl_atr_multiplier * h4_atr_ref)
+        if raw_dist >= min_dist:
+            sl_distance = min(raw_dist, max_dist)
+        else:
+            sl_distance = min_dist
+        stop_mode = "H4_HMA21_TRAIL"
+    else:
+        sl_distance = atr_value * risk_cfg.sl_atr_multiplier
+
     sl_pips = (sl_distance / spec.pip_size) if spec.pip_size > 0 else 0.0
     stop_loss_price = entry_price - sign * sl_distance
 
@@ -124,7 +148,9 @@ def build_trade_plan(
         pair=pair,
         direction=direction,
         atr_timeframe=risk_cfg.atr_timeframe,
+        stop_mode=stop_mode,
         entry_price=entry_price,
+        hma21_h4_price=hma_ref,
         atr_value=atr_value,
         atr_pips=atr_pips,
         stop_loss_price=stop_loss_price,

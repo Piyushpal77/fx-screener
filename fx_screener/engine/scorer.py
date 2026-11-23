@@ -42,8 +42,12 @@ class PairAnalysis:
     pillar_strength: float
     pillar_momentum: float
     pillar_volatility: float
+    raw_composite_score: float
+    hma_h4_boost: float
+    hma_trigger: str         # "★ H4 HMA TURN BULL" | "H4 HMA BULL" | "★ H4 HMA TURN BEAR" | "H4 HMA BEAR" | "PULLBACK (H4 BEAR)"
+    is_fresh_hma_entry: bool # True ONLY when H4 pullback just finished and turned into a STRONG BUY / STRONG SELL
     composite_score: float
-    signal: str              # "STRONG BUY" | "BUY" | "NEUTRAL" | "SELL" | "STRONG SELL"
+    signal: str              # "STRONG BUY" | "BUY" | "BUY (PULLBACK)" | "NEUTRAL" | "SELL (PULLBACK)" | "SELL" | "STRONG SELL"
     confluence: bool         # True when H4, D1, W1 all align beyond threshold
     confluence_label: str    # "★ BULL ALIGNED" | "★ BEAR ALIGNED" | "MIXED"
     vol_regime: str          # "SQUEEZE" | "BREAKOUT" | "EXPANDING" | "NORMAL"
@@ -63,21 +67,25 @@ class ScreenerResult:
 
 
 def score_trend_pillar(snap: IndicatorSnapshot) -> float:
-    """Score Trend Pillar (-100 to +100) using EMA 20/50/200 stack, slope, DI+/-, and ADX multiplier."""
+    """Score Trend Pillar (-100 to +100) using Fast/Slow Hull Moving Averages (HMA 9/21), EMA 50/200 stack, DI+/-, and ADX."""
     points = 0.0
-    # Price vs EMAs (up to +/- 45)
-    points += 15.0 if snap.close > snap.ema20 else -15.0
-    points += 15.0 if snap.close > snap.ema50 else -15.0
-    points += 15.0 if snap.close > snap.ema200 else -15.0
+    # 1. Hull Moving Average (HMA 9 & HMA 21) low-lag directional structure (up to +/- 35)
+    points += 12.0 if snap.close > snap.hma21 else -12.0
+    points += 13.0 if snap.hma9 > snap.hma21 else -13.0
+    # HMA(9) slope normalized by ATR% so low-volatility and high-volatility pairs scale evenly
+    vol_norm = max(snap.atr_pct, 0.12)
+    hma_slope_norm = (snap.hma9_slope_pct / vol_norm) * 28.0
+    points += float(np.clip(hma_slope_norm, -10.0, 10.0))
 
-    # EMA stack structure (up to +/- 30)
-    points += 15.0 if snap.ema20 > snap.ema50 else -15.0
-    points += 15.0 if snap.ema50 > snap.ema200 else -15.0
+    # 2. Macro EMA 20/50/200 stack structure (up to +/- 45)
+    points += 10.0 if snap.close > snap.ema50 else -10.0
+    points += 12.0 if snap.close > snap.ema200 else -12.0
+    points += 11.0 if snap.ema20 > snap.ema50 else -11.0
+    points += 12.0 if snap.ema50 > snap.ema200 else -12.0
 
-    # Directional movement DI+ vs DI- and EMA20 slope (up to +/- 25)
+    # 3. Directional movement DI+ vs DI- (up to +/- 20)
     di_spread = snap.plus_di - snap.minus_di
-    points += float(np.clip(di_spread * 0.8, -15.0, 15.0))
-    points += float(np.clip(snap.ema20_slope_pct * 15.0, -10.0, 10.0))
+    points += float(np.clip(di_spread * 0.85, -20.0, 20.0))
 
     # ADX trend strength multiplier:
     # ADX >= 30 boosts trend conviction by up to 1.25x; ADX < 18 dampens range-bound noise to 0.65x
@@ -143,16 +151,78 @@ def score_volatility_pillar(snap: IndicatorSnapshot, trend_direction: float) -> 
     return float(np.clip(base_dir_score + vol_bonus, -100.0, 100.0))
 
 
-def classify_signal(score: float, config: AppConfig) -> str:
+def compute_h4_hma_boost_and_trigger(
+    h4_snap: IndicatorSnapshot,
+    d1_score: float,
+    w1_score: float,
+) -> tuple[float, str, bool]:
+    """Compute Smart Momentum Boost (+10..+15 pts) and Pullback Guard from 4-Hour HMA(9)/HMA(21).
+
+    Evaluates 4H Hull Moving Average inflections against the macro D1/W1 trend so signals
+    fire cleanly when a 4H pullback finishes and turns back into the daily/weekly trend.
+
+    Returns:
+        (boost_points, trigger_label, is_counter_trend_pullback)
+    """
+    macro_bias = 0.72 * d1_score + 0.28 * w1_score
+    hma_bull_aligned = (h4_snap.hma9 > h4_snap.hma21) and (h4_snap.hma9 >= h4_snap.hma9_prev)
+    hma_bear_aligned = (h4_snap.hma9 < h4_snap.hma21) and (h4_snap.hma9 <= h4_snap.hma9_prev)
+
+    boost = 0.0
+    is_pullback = False
+
+    if macro_bias >= 12.0:
+        # Macro Bullish trend on D1/W1
+        if h4_snap.hma_bull_cross and h4_snap.close >= h4_snap.hma9:
+            boost = 15.0
+            trigger = "★ H4 HMA TURN BULL"
+        elif hma_bull_aligned and h4_snap.close >= h4_snap.hma21:
+            boost = 10.0
+            trigger = "H4 HMA BULL"
+        elif hma_bear_aligned or h4_snap.close < h4_snap.hma21:
+            boost = -8.0
+            is_pullback = True
+            trigger = "PULLBACK (H4 BEAR)"
+        else:
+            trigger = f"H4 {h4_snap.hma_status}"
+    elif macro_bias <= -12.0:
+        # Macro Bearish trend on D1/W1
+        if h4_snap.hma_bear_cross and h4_snap.close <= h4_snap.hma9:
+            boost = -15.0
+            trigger = "★ H4 HMA TURN BEAR"
+        elif hma_bear_aligned and h4_snap.close <= h4_snap.hma21:
+            boost = -10.0
+            trigger = "H4 HMA BEAR"
+        elif hma_bull_aligned or h4_snap.close > h4_snap.hma21:
+            boost = 8.0
+            is_pullback = True
+            trigger = "PULLBACK (H4 BULL)"
+        else:
+            trigger = f"H4 {h4_snap.hma_status}"
+    else:
+        # Macro Neutral / Transitioning: allow early 4H HMA inflection to give a +6/-6 lead
+        if h4_snap.hma_bull_cross:
+            boost = 6.0
+            trigger = "★ H4 HMA TURN BULL"
+        elif h4_snap.hma_bear_cross:
+            boost = -6.0
+            trigger = "★ H4 HMA TURN BEAR"
+        else:
+            trigger = f"H4 {h4_snap.hma_status}"
+
+    return boost, trigger, is_pullback
+
+
+def classify_signal(score: float, config: AppConfig, is_pullback: bool = False) -> str:
     th = config.thresholds
     if score >= th.strong_buy:
-        return "STRONG BUY"
+        return "BUY (PULLBACK)" if is_pullback else "STRONG BUY"
     if score >= th.buy:
-        return "BUY"
+        return "BUY (PULLBACK)" if is_pullback else "BUY"
     if score <= th.strong_sell:
-        return "STRONG SELL"
+        return "SELL (PULLBACK)" if is_pullback else "STRONG SELL"
     if score <= th.sell:
-        return "SELL"
+        return "SELL (PULLBACK)" if is_pullback else "SELL"
     return "NEUTRAL"
 
 
@@ -182,7 +252,7 @@ def analyze_universe(
     # Step 2: Compute G8 Currency Strength Matrix
     strength_matrix = compute_currency_strength_matrix(snapshots, config.timeframe_weights)
 
-    # Step 3: Score each pair across H4, D1, W1 and combine
+    # Step 3: Score each pair across H4, D1, W1 and apply 4H HMA Pullback Trigger
     pw = config.pillar_weights
     tw = config.timeframe_weights
     conf_min = config.thresholds.confluence_min_tf_score
@@ -240,12 +310,17 @@ def analyze_universe(
         pillar_momentum = tw.D1 * d1_s.momentum_score + tw.H4 * h4_s.momentum_score + tw.W1 * w1_s.momentum_score
         pillar_volatility = tw.D1 * d1_s.volatility_score + tw.H4 * h4_s.volatility_score + tw.W1 * w1_s.volatility_score
 
-        composite = (
+        raw_composite = (
             tw.D1 * d1_s.total_score
             + tw.H4 * h4_s.total_score
             + tw.W1 * w1_s.total_score
         )
-        composite = float(np.clip(composite, -100.0, 100.0))
+        raw_composite = float(np.clip(raw_composite, -100.0, 100.0))
+
+        hma_boost, hma_trigger, is_pullback = compute_h4_hma_boost_and_trigger(
+            h4_s.indicators, d1_s.total_score, w1_s.total_score
+        )
+        composite = float(np.clip(raw_composite + hma_boost, -100.0, 100.0))
 
         all_bull = h4_s.total_score >= conf_min and d1_s.total_score >= conf_min and w1_s.total_score >= conf_min
         all_bear = h4_s.total_score <= -conf_min and d1_s.total_score <= -conf_min and w1_s.total_score <= -conf_min
@@ -257,7 +332,11 @@ def analyze_universe(
         else:
             confluence_label = "MIXED"
 
-        signal = classify_signal(composite, config)
+        signal = classify_signal(composite, config, is_pullback=is_pullback)
+        is_fresh_hma_entry = bool(
+            (signal == "STRONG BUY" and h4_s.indicators.hma_bull_cross)
+            or (signal == "STRONG SELL" and h4_s.indicators.hma_bear_cross)
+        )
 
         # Volatility regime (prioritize D1 or H4 squeeze/breakout)
         if d1_s.indicators.vol_regime in ("BREAKOUT", "SQUEEZE"):
@@ -267,16 +346,22 @@ def analyze_universe(
         else:
             vol_regime = d1_s.indicators.vol_regime
 
-        # Trade Plan calculation
+        # Trade Plan calculation (supports D1, H4, or H4_HMA dynamic trail stop)
         atr_tf = config.risk.atr_timeframe.upper()
-        active_atr = h4_s.indicators.atr14 if atr_tf == "H4" else d1_s.indicators.atr14
+        if atr_tf in ("H4", "H4_HMA"):
+            active_atr = h4_s.indicators.atr14
+        else:
+            active_atr = d1_s.indicators.atr14
+
         trade_plan = build_trade_plan(
             pair=pair,
             composite_score=composite,
-            entry_price=d1_s.indicators.close,
+            entry_price=h4_s.indicators.close,
             atr_value=active_atr,
             risk_cfg=config.risk,
             spot_prices=spot_prices,
+            hma21_h4=h4_s.indicators.hma21,
+            atr_h4=h4_s.indicators.atr14,
         )
 
         d1_closes = [float(x) for x in universe_data[pair]["D1"]["Close"].tail(28).tolist()]
@@ -289,7 +374,7 @@ def analyze_universe(
         analyses.append(
             PairAnalysis(
                 spec=spec,
-                price=d1_s.indicators.close,
+                price=h4_s.indicators.close,
                 change_d1_pct=d1_s.indicators.change_pct,
                 h4=h4_s,
                 d1=d1_s,
@@ -298,6 +383,10 @@ def analyze_universe(
                 pillar_strength=pillar_strength,
                 pillar_momentum=pillar_momentum,
                 pillar_volatility=pillar_volatility,
+                raw_composite_score=raw_composite,
+                hma_h4_boost=hma_boost,
+                hma_trigger=hma_trigger,
+                is_fresh_hma_entry=is_fresh_hma_entry,
                 composite_score=composite,
                 signal=signal,
                 confluence=confluence,

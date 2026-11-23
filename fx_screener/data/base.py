@@ -183,3 +183,114 @@ def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
         .dropna(subset=["Open", "High", "Low", "Close"])
     )
     return agg
+
+
+def build_clean_daily_and_weekly_ohlcv(
+    df_1h: pd.DataFrame,
+    df_d1_raw: pd.DataFrame,
+    df_w1_raw: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Repair Yahoo Finance's broken FX Daily/Weekly candles where Open == Close on every bar.
+
+    1. Resamples true 24h Daily bars (`1D`) directly from the 60-day `1h` intraday bars
+       (and drops tiny <2-hour Sunday pre-open stub bars).
+    2. For older D1 history (>60 days ago) in `df_d1_raw`, sets each day's `Open` to the
+       previous trading day's `Close` whenever Yahoo's `|Open - Close|` is <8% of `High - Low`,
+       and ensures `High >= max(Open, Close)` and `Low <= min(Open, Close)`.
+    3. Splices the historical D1 bars with the intraday-resampled D1 bars and builds W1 (`W-FRI`)
+       so both D1 and W1 charts have proper full-bodied candlesticks.
+    """
+    # Step 1: Repair raw D1 historical bars (continuous 24h FX market: Open_t = Close_{t-1})
+    d1_hist = pd.DataFrame()
+    has_broken_opens = False
+    if df_d1_raw is not None and not df_d1_raw.empty:
+        d1_hist = df_d1_raw.copy().sort_index()
+        d1_hist.index = d1_hist.index.floor("1D")
+        d1_hist = d1_hist[~d1_hist.index.duplicated(keep="last")]
+
+        if len(d1_hist) >= 2:
+            prev_closes = d1_hist["Close"].shift(1)
+            ranges = (d1_hist["High"] - d1_hist["Low"]).clip(lower=0.0)
+            bodies = (d1_hist["Close"] - d1_hist["Open"]).abs()
+            # Yahoo Finance FX bug: Open is identical (or within 1 pip) to Close on almost all bars
+            broken_open_mask = (bodies <= (ranges * 0.08)) & prev_closes.notna()
+            if broken_open_mask.mean() >= 0.40:
+                has_broken_opens = True
+                d1_hist = d1_hist[d1_hist.index.dayofweek < 5]
+                prev_closes = d1_hist["Close"].shift(1)
+                ranges = (d1_hist["High"] - d1_hist["Low"]).clip(lower=0.0)
+                bodies = (d1_hist["Close"] - d1_hist["Open"]).abs()
+                broken_open_mask = (bodies <= (ranges * 0.08)) & prev_closes.notna()
+                d1_hist.loc[broken_open_mask, "Open"] = prev_closes[broken_open_mask]
+                d1_hist["High"] = d1_hist[["Open", "High", "Close"]].max(axis=1)
+                d1_hist["Low"] = d1_hist[["Open", "Low", "Close"]].min(axis=1)
+
+    if not has_broken_opens and not d1_hist.empty:
+        # D1 candles are already properly formed (e.g. OANDA or already repaired cache)
+        df_w1_out = df_w1_raw if (df_w1_raw is not None and not df_w1_raw.empty) else resample_ohlcv(d1_hist, "W-FRI")
+        return d1_hist, df_w1_out
+
+    # Step 2: Resample recent ~60 days of D1 directly from true 1-hour bars
+    d1_from_1h = pd.DataFrame()
+    if df_1h is not None and not df_1h.empty:
+        work_1h = df_1h.copy().sort_index()
+        # Count hours per UTC day so 1-2 hour Sunday 22:00 UTC pre-open stubs don't create tiny fake daily bars
+        bar_counts = work_1h["Close"].resample("1D").count()
+        agg_1d = resample_ohlcv(work_1h, "1D")
+        valid_days = bar_counts[bar_counts >= 3].index
+        d1_from_1h = agg_1d.loc[agg_1d.index.intersection(valid_days)]
+        d1_from_1h = d1_from_1h[d1_from_1h.index.dayofweek < 5]
+
+    # Step 3: Splice older repaired D1 history with recent 1h-resampled D1 bars
+    if not d1_hist.empty and not d1_from_1h.empty:
+        cutoff = d1_from_1h.index.min()
+        older = d1_hist[d1_hist.index < cutoff]
+        df_d1 = pd.concat([older, d1_from_1h]).sort_index()
+        df_d1 = df_d1[~df_d1.index.duplicated(keep="last")]
+        # Smooth the seam bar's Open with the last historical Close if needed
+        seam_idx = df_d1.index.get_loc(cutoff)
+        if isinstance(seam_idx, int) and seam_idx > 0:
+            prev_c = float(df_d1["Close"].iloc[seam_idx - 1])
+            cur_o = float(df_d1["Open"].iloc[seam_idx])
+            cur_c = float(df_d1["Close"].iloc[seam_idx])
+            cur_rng = float(df_d1["High"].iloc[seam_idx] - df_d1["Low"].iloc[seam_idx])
+            if abs(cur_c - cur_o) <= cur_rng * 0.08:
+                df_d1.iloc[seam_idx, df_d1.columns.get_loc("Open")] = prev_c
+                df_d1.iloc[seam_idx, df_d1.columns.get_loc("High")] = max(
+                    float(df_d1["High"].iloc[seam_idx]), prev_c, cur_c
+                )
+                df_d1.iloc[seam_idx, df_d1.columns.get_loc("Low")] = min(
+                    float(df_d1["Low"].iloc[seam_idx]), prev_c, cur_c
+                )
+    elif not d1_from_1h.empty:
+        df_d1 = d1_from_1h
+    else:
+        df_d1 = d1_hist
+
+    # Step 4: Build/repair W1 candles
+    if not df_d1.empty:
+        w1_from_d1 = resample_ohlcv(df_d1, "W-FRI")
+    else:
+        w1_from_d1 = pd.DataFrame()
+
+    if df_w1_raw is not None and not df_w1_raw.empty:
+        w1_hist = df_w1_raw.copy().sort_index()
+        if len(w1_hist) >= 2:
+            prev_w_closes = w1_hist["Close"].shift(1)
+            w_ranges = (w1_hist["High"] - w1_hist["Low"]).clip(lower=0.0)
+            w_bodies = (w1_hist["Close"] - w1_hist["Open"]).abs()
+            broken_w = (w_bodies <= (w_ranges * 0.08)) & prev_w_closes.notna()
+            w1_hist.loc[broken_w, "Open"] = prev_w_closes[broken_w]
+            w1_hist["High"] = w1_hist[["Open", "High", "Close"]].max(axis=1)
+            w1_hist["Low"] = w1_hist[["Open", "Low", "Close"]].min(axis=1)
+        if not w1_from_d1.empty:
+            w_cutoff = w1_from_d1.index.min()
+            w_older = w1_hist[w1_hist.index < w_cutoff]
+            df_w1 = pd.concat([w_older, w1_from_d1]).sort_index()
+            df_w1 = df_w1[~df_w1.index.duplicated(keep="last")]
+        else:
+            df_w1 = w1_hist
+    else:
+        df_w1 = w1_from_d1
+
+    return df_d1, df_w1

@@ -46,13 +46,14 @@ def compute_currency_strength_matrix(
             if snap is None:
                 continue
 
-            # Blend normalized ROC(10), ROC(20), RSI deviation from 50, and EMA20 distance
+            # Blend normalized ROC(10), ROC(20), RSI deviation from 50, and HMA(9)/EMA(20) impulse
             ema20_dist_pct = ((snap.close - snap.ema20) / snap.ema20 * 100.0) if snap.ema20 else 0.0
+            hma_dist_pct = ((snap.hma9 - snap.hma21) / snap.hma21 * 100.0) if snap.hma21 else 0.0
             rsi_centered = (snap.rsi14 - 50.0) / 25.0  # roughly -2..+2
             # Normalize ROC by ATR% so high-beta pairs don't skew the basket
             vol_norm = max(snap.atr_pct, 0.15)
             roc_signal = (0.6 * snap.roc10 + 0.4 * snap.roc20) / (vol_norm * 3.0)
-            ema_signal = ema20_dist_pct / (vol_norm * 2.0)
+            ema_signal = (0.5 * ema20_dist_pct + 0.5 * hma_dist_pct) / (vol_norm * 2.0)
 
             pair_impulse = float(np.clip(0.45 * roc_signal + 0.30 * rsi_centered + 0.25 * ema_signal, -2.5, 2.5))
             pair_score = (pair_impulse / 2.5) * 100.0

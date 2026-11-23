@@ -14,6 +14,7 @@ from textual.widgets import Button, DataTable, Footer, Header, Input, Label, Sta
 from fx_screener.config import AppConfig
 from fx_screener.data import load_or_fetch_universe
 from fx_screener.engine.scorer import PairAnalysis, ScreenerResult, analyze_universe
+from fx_screener.engine.tracker import SignalTracker
 from fx_screener.ui.cli_renderer import (
     export_screener_results,
     filter_pairs,
@@ -227,6 +228,7 @@ class FxScreenerApp(App):
             "RSI",
             "Regime",
         )
+        self.tracker = SignalTracker()
         self._refresh_data(force=False)
         if self.config.provider.auto_refresh_seconds > 0:
             self.set_interval(
@@ -237,6 +239,8 @@ class FxScreenerApp(App):
     def _refresh_data(self, force: bool = False) -> None:
         self.universe_data, source = load_or_fetch_universe(self.config, force_refresh=force)
         self.result = analyze_universe(self.universe_data, self.config, source=source)
+        if hasattr(self, "tracker"):
+            self.tracker.sync_and_evaluate(self.result.pairs, self.universe_data)
         self.last_refresh_str = datetime.now().strftime("%H:%M:%S")
         self._check_alerts()
         self._rebuild_view()
@@ -382,10 +386,12 @@ class FxScreenerApp(App):
         self._recompute_scores_only()
 
     def action_toggle_atr_tf(self) -> None:
+        modes = ["D1", "H4", "H4_HMA"]
         cur = self.config.risk.atr_timeframe.upper()
-        self.config.risk.atr_timeframe = "H4" if cur == "D1" else "D1"
+        next_idx = (modes.index(cur) + 1) % len(modes) if cur in modes else 0
+        self.config.risk.atr_timeframe = modes[next_idx]
         self.config.save()
-        self.notify(f"Switched Trade Planner to {self.config.risk.atr_timeframe} ATR(14)")
+        self.notify(f"Switched Trade Planner Stop Mode to {self.config.risk.atr_timeframe}")
         self._recompute_scores_only()
 
     def action_open_risk_modal(self) -> None:
