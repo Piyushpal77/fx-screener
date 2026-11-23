@@ -15,23 +15,27 @@ from fx_screener.universe import ALL_PAIRS, FX_28_PAIRS, G8_CURRENCIES, UNIVERSE
 
 
 def test_universe_contains_28_fx_plus_gold_silver() -> None:
-    assert len(UNIVERSE) == 30
+    assert len(UNIVERSE) == 31
     assert len(FX_28_PAIRS) == 28
+    assert "USD/JPY" in ALL_PAIRS
+    assert "USD/INR" in ALL_PAIRS
     assert "XAU/USD" in ALL_PAIRS
     assert "XAG/USD" in ALL_PAIRS
     majors = [s for s in UNIVERSE if s.category == "Major"]
     minors = [s for s in UNIVERSE if s.category == "Minor"]
+    exotics = [s for s in UNIVERSE if s.category == "Exotic"]
     commodities = [s for s in UNIVERSE if s.category == "Commodity"]
     assert len(majors) == 7
     assert len(minors) == 21
+    assert len(exotics) == 1
     assert len(commodities) == 2
 
 
 def test_synthetic_provider_and_indicators() -> None:
     provider = SyntheticProvider(seed=101)
     data = provider.fetch_universe()
-    assert len(data) == 30
-    for pair in ("EUR/USD", "GBP/JPY", "XAU/USD", "XAG/USD"):
+    assert len(data) == 31
+    for pair in ("EUR/USD", "GBP/JPY", "USD/JPY", "USD/INR", "XAU/USD", "XAG/USD"):
         assert set(data[pair].keys()) == {"H1", "H4", "D1", "W1"}
         snap_d1 = compute_indicators(data[pair]["D1"])
         assert snap_d1.close > 0
@@ -45,7 +49,7 @@ def test_analyze_universe_scoring_and_strength_matrix() -> None:
     data = SyntheticProvider(seed=42).fetch_universe()
     result = analyze_universe(data, cfg, source="synthetic")
 
-    assert len(result.pairs) == 30
+    assert len(result.pairs) == 31
     assert len(result.strength_matrix.ranked) == len(G8_CURRENCIES)
 
     # Verify G8 currencies are sorted strongest to weakest
@@ -176,7 +180,7 @@ def test_web_app_chart_endpoints(tmp_path: Path) -> None:
     app = create_web_app(config=cfg, tracker=test_tracker)
     state = app.state.screener
     assert state.result is not None
-    assert len(state.result.pairs) == 30
+    assert len(state.result.pairs) == 31
 
     # Verify all 4 timeframes (W1, D1, H4, H1) exist for interactive charting
     for tf in ("W1", "D1", "H4", "H1"):

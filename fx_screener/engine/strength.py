@@ -131,9 +131,11 @@ def get_pair_strength_pillar_score(
         # Diff ranges roughly -170..+170; scale to -100..+100
         return float(np.clip(diff * 0.75, -100.0, 100.0))
 
-    # For Precious Metals (XAU/USD, XAG/USD), compute metal intrinsic momentum vs USD basket score
+    # For non-G8 pairs (e.g. XAU/USD, XAG/USD, USD/INR), compute intrinsic momentum vs USD basket score
     usd_score = tf_scores.get("USD", 0.0)
     vol_norm = max(snap.atr_pct, 0.25)
-    metal_impulse = ((0.6 * snap.roc10 + 0.4 * snap.roc20) / (vol_norm * 2.5)) * 45.0 + (snap.rsi14 - 50.0) * 1.5
-    metal_score = float(np.clip(metal_impulse, -100.0, 100.0))
-    return float(np.clip((metal_score - usd_score) * 0.75, -100.0, 100.0))
+    pair_impulse = ((0.6 * snap.roc10 + 0.4 * snap.roc20) / (vol_norm * 2.5)) * 45.0 + (snap.rsi14 - 50.0) * 1.5
+    pair_score = float(np.clip(pair_impulse, -100.0, 100.0))
+    if spec.base == "USD":
+        return float(np.clip(0.55 * pair_score + 0.45 * usd_score, -100.0, 100.0))
+    return float(np.clip((pair_score - usd_score) * 0.75, -100.0, 100.0))

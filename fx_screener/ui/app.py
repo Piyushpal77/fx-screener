@@ -162,7 +162,7 @@ class FxScreenerApp(App):
     """
 
     BINDINGS = [
-        Binding("1", "filter_mode('all')", "1:All(30)"),
+        Binding("1", "filter_mode('all')", "1:All(31)"),
         Binding("2", "filter_mode('confluence')", "2:Confluence★"),
         Binding("3", "filter_mode('strong')", "3:Strong(>=60)"),
         Binding("4", "filter_mode('squeeze')", "4:Squeeze/Brk"),
@@ -301,7 +301,7 @@ class FxScreenerApp(App):
         q_label = f" | Search: {self.currency_query}" if self.currency_query else ""
         status_text = (
             f" Source: {self.result.source} | Updated: {self.last_refresh_str} | "
-            f"Filter: {self.filter_mode_name.upper()} ({len(self.displayed_pairs)}/30){q_label} | "
+            f"Filter: {self.filter_mode_name.upper()} ({len(self.displayed_pairs)}/{len(self.result.pairs)}){q_label} | "
             f"Sort: {sort_label} | ATR: {self.config.risk.atr_timeframe} ({self.config.risk.sl_atr_multiplier}x) | "
             f"Acct: ${self.config.risk.account_balance_usd:,.0f} @ {self.config.risk.risk_percent:.1f}%"
         )

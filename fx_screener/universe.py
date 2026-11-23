@@ -1,4 +1,4 @@
-"""Universe of 28 G8 FX pairs and 2 Precious Metals (Gold & Silver)."""
+"""Universe of 28 G8 FX pairs, USD/INR, and 2 Precious Metals (Gold & Silver)."""
 
 from __future__ import annotations
 
@@ -82,6 +82,22 @@ def _build_universe() -> List[InstrumentSpec]:
                 decimals=3 if is_jpy else 5,
             )
         )
+
+    # Add Exotic FX: USD/INR
+    specs.append(
+        InstrumentSpec(
+            pair="USD/INR",
+            base="USD",
+            quote="INR",
+            category="Exotic",
+            yf_ticker="USDINR=X",
+            yf_fallback="INR=X",
+            oanda_instrument="USD_INR",
+            pip_size=0.01,         # 0.01 INR per pip
+            contract_size=100_000.0,
+            decimals=3,
+        )
+    )
 
     # Add Key Commodities: Gold (XAU/USD) and Silver (XAG/USD)
     specs.append(

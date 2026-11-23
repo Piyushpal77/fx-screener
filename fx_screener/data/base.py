@@ -42,6 +42,7 @@ BASELINE_PRICES: Dict[str, float] = {
     "CAD/JPY": 110.30,
     "CAD/CHF": 0.6323,
     "CHF/JPY": 174.43,
+    "USD/INR": 84.40,
     "XAU/USD": 2655.40,
     "XAG/USD": 31.15,
 }
