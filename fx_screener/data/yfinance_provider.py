@@ -68,6 +68,37 @@ class YFinanceProvider(MarketDataProvider):
 
         return clean.sort_index()
 
+    def fetch_live_spot_quotes(self, pairs: List[str] | None = None) -> Dict[str, float]:
+        """Fetch real-time streaming FX & Metal spot prices via Yahoo Finance v8 chart meta + 1m quote."""
+        import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
+
+        target_pairs = pairs or ALL_PAIRS
+        specs = [UNIVERSE_MAP[p] for p in target_pairs if p in UNIVERSE_MAP]
+        quotes: Dict[str, float] = {}
+
+        def _fetch_one(spec: Any) -> tuple[str, float | None]:
+            for tk in (spec.yf_ticker, spec.yf_fallback):
+                try:
+                    t = yf.Ticker(tk)
+                    fi = getattr(t, "fast_info", None)
+                    if fi is not None:
+                        lp = getattr(fi, "last_price", None)
+                        if lp is not None and float(lp) > 0:
+                            return spec.pair, float(lp)
+                except Exception:
+                    pass
+            return spec.pair, None
+
+        try:
+            with ThreadPoolExecutor(max_workers=12) as pool:
+                for pair, price in pool.map(_fetch_one, specs):
+                    if price is not None and price > 0:
+                        quotes[pair] = price
+        except Exception:
+            pass
+        return quotes
+
     def fetch_universe(
         self, pairs: List[str] | None = None
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
@@ -182,6 +213,7 @@ class YFinanceProvider(MarketDataProvider):
             progress=False,
             threads=True,
         )
+        live_spot_quotes = self.fetch_live_spot_quotes(target_pairs)
 
         updated: Dict[str, Dict[str, pd.DataFrame]] = {
             p: {tf: df.copy() for tf, df in tfs.items()}
@@ -228,6 +260,17 @@ class YFinanceProvider(MarketDataProvider):
                     elif last_1m_hour > merged_h1.index[-1]:
                         merged_h1 = pd.concat([merged_h1, h1_from_1m.tail(1)]).sort_index()
                         merged_h1 = merged_h1[~merged_h1.index.duplicated(keep="last")]
+
+            # Apply real-time streaming quote from fast_info if available
+            spot_q = live_spot_quotes.get(pair)
+            if spot_q is not None and spot_q > 0 and not merged_h1.empty:
+                merged_h1.iloc[-1, merged_h1.columns.get_loc("Close")] = float(spot_q)
+                merged_h1.iloc[-1, merged_h1.columns.get_loc("High")] = max(
+                    float(merged_h1["High"].iloc[-1]), float(spot_q)
+                )
+                merged_h1.iloc[-1, merged_h1.columns.get_loc("Low")] = min(
+                    float(merged_h1["Low"].iloc[-1]), float(spot_q)
+                )
 
             if merged_h1.empty:
                 continue

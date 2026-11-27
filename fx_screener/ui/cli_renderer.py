@@ -174,7 +174,7 @@ def render_cli_once(
     )
     table.add_column("★", justify="center", no_wrap=True)
     table.add_column("Pair", style="bold white", no_wrap=True)
-    table.add_column("Price", justify="right", no_wrap=True)
+    table.add_column("Live Price", justify="right", no_wrap=True)
     table.add_column("D1%", justify="right", no_wrap=True)
     table.add_column("Score", justify="right", no_wrap=True)
     table.add_column("Signal", justify="center", no_wrap=True)

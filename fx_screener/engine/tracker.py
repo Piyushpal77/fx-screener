@@ -481,7 +481,7 @@ class SignalTracker:
     def export_csv(self, signals: Optional[List[TrackedSignal]] = None) -> Path:
         """Write a clean, concise Excel-friendly CSV spreadsheet with the exact requested columns:
         Trade Suggested, Date of Recommendation, Entry Price, Target Price, Stop Loss Price,
-        Current 4H Price, Outcome / Status, and Date Reached.
+        Live Price, Outcome / Status, and Date Reached.
         """
         rows = signals if signals is not None else self.list_signals()
         fieldnames = [
@@ -490,7 +490,7 @@ class SignalTracker:
             "Entry Price",
             "Target Price (TP2)",
             "Stop Loss Price",
-            "Current 4H Price",
+            "Live Price",
             "Outcome / Status",
             "Date Reached",
         ]
@@ -507,7 +507,7 @@ class SignalTracker:
                 elif s.status == "TP1_HIT":
                     outcome = "In Progress (TP1 Reached, Tracking to Target)"
                 else:
-                    outcome = "In Progress (Tracking 4H)"
+                    outcome = "In Progress (Live Tracking)"
 
                 writer.writerow(
                     {
@@ -516,7 +516,7 @@ class SignalTracker:
                         "Entry Price": f"{s.entry_price:.{dec}f}",
                         "Target Price (TP2)": f"{s.tp2_price:.{dec}f}",
                         "Stop Loss Price": f"{s.stop_loss_price:.{dec}f}",
-                        "Current 4H Price": f"{s.current_h4_price:.{dec}f}",
+                        "Live Price": f"{s.current_h4_price:.{dec}f}",
                         "Outcome / Status": outcome,
                         "Date Reached": s.exit_time if s.exit_time else "-",
                     }

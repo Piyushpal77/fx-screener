@@ -216,7 +216,7 @@ class FxScreenerApp(App):
         table.add_columns(
             "★",
             "Pair",
-            "Price",
+            "Live Price",
             "D1%",
             "Score",
             "Signal",

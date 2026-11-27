@@ -373,10 +373,17 @@ def analyze_universe(
         else:
             active_atr = d1_s.indicators.atr14
 
+        # Live streaming spot price (from latest 1m / H1 tick merged into H1/H4/D1)
+        h1_df = universe_data[pair].get("H1")
+        if h1_df is not None and not h1_df.empty:
+            live_price = float(h1_df["Close"].iloc[-1])
+        else:
+            live_price = h4_s.indicators.close
+
         trade_plan = build_trade_plan(
             pair=pair,
             composite_score=composite,
-            entry_price=h4_s.indicators.close,
+            entry_price=live_price,
             atr_value=active_atr,
             risk_cfg=config.risk,
             spot_prices=spot_prices,
@@ -394,7 +401,7 @@ def analyze_universe(
         analyses.append(
             PairAnalysis(
                 spec=spec,
-                price=h4_s.indicators.close,
+                price=live_price,
                 change_d1_pct=d1_s.indicators.change_pct,
                 h4=h4_s,
                 d1=d1_s,

@@ -73,6 +73,55 @@ class ScreenerWebState:
                 target=self._live_minute_worker, daemon=True, name="fx-live-1m-worker"
             )
             self._worker_thread.start()
+            self._quote_thread = threading.Thread(
+                target=self._live_quote_stream_worker, daemon=True, name="fx-live-quote-streamer"
+            )
+            self._quote_thread.start()
+
+    def _live_quote_stream_worker(self) -> None:
+        """Fast 15-second live quote streamer that updates spot prices in-memory between 1-minute full bar recalculations."""
+        from fx_screener.data import get_provider
+
+        while not self._stop_event.wait(15.0):
+            try:
+                provider = get_provider(self.config)
+                fetch_fn = getattr(provider, "fetch_live_spot_quotes", None)
+                if not callable(fetch_fn) or not self.universe_data:
+                    continue
+                quotes = fetch_fn()
+                if not quotes:
+                    continue
+                with self.lock:
+                    for pair, spot_price in quotes.items():
+                        tfs = self.universe_data.get(pair)
+                        if not tfs:
+                            continue
+                        for tf_df in tfs.values():
+                            if tf_df is not None and not tf_df.empty:
+                                tf_df.iloc[-1, tf_df.columns.get_loc("Close")] = float(spot_price)
+                                tf_df.iloc[-1, tf_df.columns.get_loc("High")] = max(
+                                    float(tf_df["High"].iloc[-1]), float(spot_price)
+                                )
+                                tf_df.iloc[-1, tf_df.columns.get_loc("Low")] = min(
+                                    float(tf_df["Low"].iloc[-1]), float(spot_price)
+                                )
+                    if self.result:
+                        for p in self.result.pairs:
+                            sp = quotes.get(p.spec.pair)
+                            if sp is not None and sp > 0:
+                                prev_d1 = p.d1.indicators.prev_close
+                                p.price = float(sp)
+                                if prev_d1 > 0:
+                                    p.change_d1_pct = (float(sp) - prev_d1) / prev_d1 * 100.0
+                        for sig in self.tracked_signals:
+                            sp = quotes.get(sig.pair)
+                            if sp is not None and sp > 0 and sig.status in ("ACTIVE", "TP1_HIT"):
+                                spec = UNIVERSE_MAP.get(sig.pair)
+                                dec = spec.decimals if spec else 5
+                                sig.current_h4_price = round(float(sp), dec)
+                    self.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
 
     def _live_minute_worker(self) -> None:
         """Background daemon that updates live FX & Metal prices and recalculates scores every 60s."""
@@ -287,6 +336,23 @@ def create_web_app(
             "tracker": {
                 "summary": state.tracker.summary_stats(state.tracked_signals),
                 "signals": [asdict(s) for s in state.tracked_signals],
+            },
+        }
+
+    @app.get("/api/quotes")
+    def get_live_quotes() -> Dict[str, Any]:
+        """Lightweight streaming endpoint returning live spot prices, D1% changes, and current candle OHLC for the active pair."""
+        res = state.result
+        if res is None:
+            raise HTTPException(status_code=503, detail="Screener state not initialized")
+        return {
+            "last_updated": state.last_updated,
+            "quotes": {
+                p.spec.pair: {
+                    "price": round(p.price, p.spec.decimals),
+                    "change_d1_pct": round(p.change_d1_pct, 2),
+                }
+                for p in res.pairs
             },
         }
 

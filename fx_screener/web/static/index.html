@@ -898,6 +898,48 @@
       animation: flashRedPulse 1.35s ease-in-out infinite;
     }
 
+    /* Live Price Tick Flash Animations (Green Uptick / Red Downtick) */
+    @keyframes livePriceUpFlash {
+      0% {
+        background-color: rgba(16, 185, 129, 0.42);
+        color: #6ee7b7;
+      }
+      100% {
+        background-color: transparent;
+      }
+    }
+
+    @keyframes livePriceDownFlash {
+      0% {
+        background-color: rgba(239, 68, 68, 0.42);
+        color: #fca5a5;
+      }
+      100% {
+        background-color: transparent;
+      }
+    }
+
+    .live-tick-up {
+      animation: livePriceUpFlash 1.6s ease-out;
+      border-radius: 4px;
+    }
+
+    .live-tick-down {
+      animation: livePriceDownFlash 1.6s ease-out;
+      border-radius: 4px;
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 6px #10b981;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
     /* Dotted Vertical Entry Date Line Overlay on Main Chart */
     .entry-vline-overlay {
       position: absolute;
@@ -995,7 +1037,7 @@
             <tr>
               <th style="width:28px;" onclick="setSort('watchlist')">★</th>
               <th onclick="setSort('pair')">Instrument</th>
-              <th onclick="setSort('price')" style="text-align:right;">4H Price</th>
+              <th onclick="setSort('price')" style="text-align:right;"><span class="live-dot"></span>Live Price</th>
               <th onclick="setSort('change')" style="text-align:right;">D1%</th>
               <th onclick="setSort('composite')" style="text-align:center;">Score ▼</th>
               <th onclick="setSort('composite')" style="text-align:center;">Signal</th>
@@ -1021,7 +1063,7 @@
               <th style="text-align:right;">Entry Price</th>
               <th style="text-align:right;">Target (TP2)</th>
               <th style="text-align:right;">Stop Loss</th>
-              <th style="text-align:right;">Current 4H</th>
+              <th style="text-align:right;"><span class="live-dot"></span>Live Price</th>
               <th>Outcome / Status</th>
               <th>Date Reached</th>
             </tr>
@@ -1106,6 +1148,8 @@
     let sortField = "composite";
     let sortAsc = false;
     let acknowledgedPairs = new Set();
+    let previousLivePrices = {};
+    let liveTickDirections = {};
     let currentEntryAnchorTime = null;
     let currentEntryLabelText = "";
     let currentEntryIsLong = true;
@@ -1120,6 +1164,63 @@
     let autoRefreshSeconds = 60;
     let countdownRemaining = 60;
     let countdownTimerId = null;
+    let liveQuoteStreamTimerId = null;
+
+    function startLiveQuoteStreamer() {
+      if (liveQuoteStreamTimerId) clearInterval(liveQuoteStreamTimerId);
+      liveQuoteStreamTimerId = setInterval(async () => {
+        if (!screenerData || !screenerData.pairs) return;
+        try {
+          const resp = await fetch(`/api/quotes?_t=${Date.now()}`);
+          if (!resp.ok) return;
+          const payload = await resp.json();
+          const quotes = payload.quotes || {};
+          let anyChanged = false;
+          screenerData.pairs.forEach(p => {
+            const q = quotes[p.pair];
+            if (q && q.price !== undefined) {
+              if (p.price !== q.price) {
+                liveTickDirections[p.pair] = q.price > p.price ? "up" : "down";
+                p.price = q.price;
+                p.change_d1_pct = q.change_d1_pct;
+                if (p.trade_plan) p.trade_plan.entry_price = q.price;
+                anyChanged = true;
+              }
+              previousLivePrices[p.pair] = q.price;
+            }
+          });
+          if (screenerData.tracker && screenerData.tracker.signals) {
+            screenerData.tracker.signals.forEach(s => {
+              const q = quotes[s.pair];
+              if (q && (s.status === "ACTIVE" || s.status === "TP1_HIT")) {
+                s.current_h4_price = q.price;
+              }
+            });
+          }
+          if (anyChanged) {
+            renderScreenerTable();
+            renderTrackerTable();
+            const selMeta = screenerData.pairs.find(p => p.pair === selectedPair);
+            if (selMeta) {
+              document.getElementById("chart-pair-price").textContent = selMeta.price.toFixed(selMeta.decimals);
+              // Stream the live spot tick into the current candle on the chart in-place without resetting zoom
+              if (lastChartPayload && lastChartPayload.candles && lastChartPayload.candles.length > 0 && candleSeries) {
+                const lastBar = lastChartPayload.candles[lastChartPayload.candles.length - 1];
+                const updatedBar = {
+                  time: lastBar.time,
+                  open: lastBar.open,
+                  high: Math.max(lastBar.high, selMeta.price),
+                  low: Math.min(lastBar.low, selMeta.price),
+                  close: selMeta.price,
+                };
+                lastChartPayload.candles[lastChartPayload.candles.length - 1] = updatedBar;
+                try { candleSeries.update(updatedBar); } catch (e) {}
+              }
+            }
+          }
+        } catch (e) {}
+      }, 15000);
+    }
 
     function startAutoRefreshCountdown() {
       if (countdownTimerId) clearInterval(countdownTimerId);
@@ -1299,6 +1400,7 @@
 
       // Sync header risk inputs
       const rc = screenerData.risk_config;
+      updateLivePriceTickStates(screenerData.pairs);
       document.getElementById("inp-balance").value = rc.account_balance_usd;
       document.getElementById("inp-risk").value = rc.risk_percent;
       document.getElementById("sel-atr-tf").value = rc.atr_timeframe;
@@ -1437,6 +1539,17 @@
       await selectTrackedSignal(sigId, pair);
     }
 
+    function updateLivePriceTickStates(pairs) {
+      if (!pairs) return;
+      pairs.forEach(p => {
+        const prev = previousLivePrices[p.pair];
+        if (prev !== undefined && p.price !== prev) {
+          liveTickDirections[p.pair] = p.price > prev ? "up" : "down";
+        }
+        previousLivePrices[p.pair] = p.price;
+      });
+    }
+
     function renderScreenerTable() {
       const rows = getFilteredAndSortedPairs();
       const tbody = document.getElementById("screener-tbody");
@@ -1451,6 +1564,9 @@
         const chgClass = p.change_d1_pct >= 0 ? "bull-text" : "bear-text";
         const confClass = p.confluence_label.includes("BULL") ? "conf-bull" : (p.confluence_label.includes("BEAR") ? "conf-bear" : "conf-mixed");
         const regClass = p.vol_regime.includes("SQUEEZE") ? "reg-squeeze" : (p.vol_regime.includes("BREAKOUT") ? "reg-breakout" : "reg-normal");
+        const tickDir = liveTickDirections[p.pair];
+        const tickClass = tickDir === "up" ? "live-tick-up" : (tickDir === "down" ? "live-tick-down" : "");
+        const tickArrow = tickDir === "up" ? `<span class="bull-text" style="font-size:10px;">▲</span> ` : (tickDir === "down" ? `<span class="bear-text" style="font-size:10px;">▼</span> ` : "");
 
         return `
           <tr class="${isSel} ${flashClass}" onclick="selectPair('${p.pair}')">
@@ -1463,7 +1579,7 @@
                 <span class="cat-tag ${p.category}">${p.category}</span>
               </div>
             </td>
-            <td class="mono" style="text-align:right; font-weight:600;">${p.price.toFixed(p.decimals)}</td>
+            <td class="mono ${tickClass}" style="text-align:right; font-weight:600;">${tickArrow}${p.price.toFixed(p.decimals)}</td>
             <td class="mono ${chgClass}" style="text-align:right;">${p.change_d1_pct >= 0 ? '+' : ''}${p.change_d1_pct.toFixed(2)}%</td>
             <td style="text-align:center;">${formatScoreCell(p.composite_score)}</td>
             <td style="text-align:center;"><span class="signal-badge ${getSignalClass(p.signal)}">${p.signal}</span></td>
@@ -1523,7 +1639,12 @@
           outcomeBadge = `<span class="hma-badge hma-pullback">● In Progress (Tracking 4H)</span>`;
         }
 
-        const curOrExit = (s.status === "WIN_TP2" || s.status === "LOSS_SL") ? s.exit_price : s.current_h4_price;
+        const liveSpot = pairMeta ? pairMeta.price : s.current_h4_price;
+        const curOrExit = (s.status === "WIN_TP2" || s.status === "LOSS_SL") ? s.exit_price : liveSpot;
+        const tickDir = liveTickDirections[s.pair];
+        const tickClass = (s.status === "ACTIVE" || s.status === "TP1_HIT")
+          ? (tickDir === "up" ? "live-tick-up" : (tickDir === "down" ? "live-tick-down" : ""))
+          : "";
 
         return `
           <tr class="${isSel} ${flashClass}" onclick="focusFlashedRecommendation(${s.id}, '${s.pair}')">
@@ -1535,7 +1656,7 @@
             <td class="mono" style="text-align:right; font-weight:700;">${s.entry_price.toFixed(dec)}</td>
             <td class="mono bull-text" style="text-align:right; font-weight:700;">${s.tp2_price.toFixed(dec)}</td>
             <td class="mono bear-text" style="text-align:right; font-weight:700;">${s.stop_loss_price.toFixed(dec)}</td>
-            <td class="mono" style="text-align:right; font-weight:600;">${curOrExit.toFixed(dec)}</td>
+            <td class="mono ${tickClass}" style="text-align:right; font-weight:600;">${curOrExit.toFixed(dec)}</td>
             <td>${outcomeBadge}</td>
             <td class="mono" style="color:var(--text-muted);">${s.exit_time || "-"}</td>
           </tr>
@@ -1970,7 +2091,7 @@
 
       document.getElementById("ticket-main-grid").innerHTML = `
         <div class="ticket-box">
-          <div class="ticket-label">4H Entry Reference (${pairMeta.hma_trigger})</div>
+          <div class="ticket-label"><span class="live-dot"></span>Live Streaming Price (${pairMeta.hma_trigger})</div>
           <div class="ticket-val">${tp.entry_price.toFixed(dec)}</div>
         </div>
         <div class="ticket-box">
@@ -2120,6 +2241,7 @@
         const resp = await fetch("/api/refresh", { method: "POST" });
         if (resp.ok) {
           screenerData = await resp.json();
+          updateLivePriceTickStates(screenerData.pairs);
           document.getElementById("status-source").textContent =
             `${screenerData.source} • ${screenerData.last_updated.split(" ")[1] || screenerData.last_updated}`;
           renderCurrencyStrength();
@@ -2140,6 +2262,7 @@
       initCharts();
       await loadScreenerData();
       startAutoRefreshCountdown();
+      startLiveQuoteStreamer();
     });
   </script>
 </body>
