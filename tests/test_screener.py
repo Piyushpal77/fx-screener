@@ -191,6 +191,13 @@ def test_web_app_chart_endpoints(tmp_path: Path) -> None:
         df = state.universe_data["EUR/USD"].get(tf)
         assert df is not None and not df.empty
 
+    # Verify 1-minute live incremental bar update works and recalculates scores
+    prev_close = float(state.universe_data["EUR/USD"]["H1"]["Close"].iloc[-1])
+    state.refresh_live_tick()
+    new_close = float(state.universe_data["EUR/USD"]["H1"]["Close"].iloc[-1])
+    assert new_close > 0
+    assert new_close != prev_close
+
 
 def test_h4_strong_signal_tracker_and_csv_spreadsheet(tmp_path: Path) -> None:
     import pandas as pd

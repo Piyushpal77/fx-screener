@@ -49,8 +49,8 @@ class RiskConfig:
 @dataclass
 class ProviderConfig:
     active: str = "yfinance"
-    cache_ttl_seconds: int = 300
-    auto_refresh_seconds: int = 300
+    cache_ttl_seconds: int = 60
+    auto_refresh_seconds: int = 60
     oanda_api_key: str = ""
     oanda_account_id: str = ""
     oanda_environment: str = "practice"
@@ -79,8 +79,8 @@ class AppConfig:
         oanda_raw = prov_raw.get("oanda", {}) or {}
         provider = ProviderConfig(
             active=prov_raw.get("active", "yfinance"),
-            cache_ttl_seconds=int(prov_raw.get("cache_ttl_seconds", 300)),
-            auto_refresh_seconds=int(prov_raw.get("auto_refresh_seconds", 300)),
+            cache_ttl_seconds=int(prov_raw.get("cache_ttl_seconds", 60)),
+            auto_refresh_seconds=int(prov_raw.get("auto_refresh_seconds", 60)),
             oanda_api_key=os.environ.get("OANDA_API_KEY", oanda_raw.get("api_key", "")),
             oanda_account_id=os.environ.get("OANDA_ACCOUNT_ID", oanda_raw.get("account_id", "")),
             oanda_environment=oanda_raw.get("environment", "practice"),

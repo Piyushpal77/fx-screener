@@ -85,6 +85,33 @@ def load_or_fetch_universe(
         return synth_data, "synthetic-fallback"
 
 
+def update_live_universe(
+    config: AppConfig,
+    existing_data: Dict[str, Dict[str, pd.DataFrame]],
+    pairs: List[str] | None = None,
+) -> Tuple[Dict[str, Dict[str, pd.DataFrame]], str]:
+    """Incrementally fetch 1-minute live price updates and merge into existing OHLCV bars."""
+    target_pairs = pairs or ALL_PAIRS
+    if not existing_data:
+        return load_or_fetch_universe(config, force_refresh=True, pairs=target_pairs)
+
+    provider = get_provider(config)
+    cache = MarketDataCache(ttl_seconds=config.provider.cache_ttl_seconds)
+    try:
+        updated = provider.update_live_bars(existing_data, target_pairs)
+        to_cache = {
+            p: tfs
+            for p, tfs in updated.items()
+            if not any(df.attrs.get("is_synthetic", False) for df in tfs.values())
+        }
+        if to_cache:
+            cache.save_universe(to_cache, provider_name=provider.name)
+        return updated, f"{provider.name} (live 1m)"
+    except Exception as exc:
+        logger.warning("Live 1m update failed (%s); retaining current bars.", exc)
+        return existing_data, f"{provider.name} (cached)"
+
+
 __all__ = [
     "MarketDataProvider",
     "SyntheticProvider",
@@ -93,4 +120,5 @@ __all__ = [
     "MarketDataCache",
     "get_provider",
     "load_or_fetch_universe",
+    "update_live_universe",
 ]

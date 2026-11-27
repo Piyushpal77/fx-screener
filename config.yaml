@@ -1,7 +1,7 @@
 provider:
   active: yfinance
-  cache_ttl_seconds: 300
-  auto_refresh_seconds: 300
+  cache_ttl_seconds: 60
+  auto_refresh_seconds: 60
   oanda:
     api_key: ''
     account_id: ''

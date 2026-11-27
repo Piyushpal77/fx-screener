@@ -57,7 +57,15 @@ class MarketDataProvider(ABC):
     def fetch_universe(
         self, pairs: List[str] | None = None
     ) -> Dict[str, Dict[str, pd.DataFrame]]:
-        """Return {pair: {'H4': df, 'D1': df, 'W1': df}} with columns [Open, High, Low, Close, Volume]."""
+        """Return {pair: {'H1': df, 'H4': df, 'D1': df, 'W1': df}} with columns [Open, High, Low, Close, Volume]."""
+
+    def update_live_bars(
+        self,
+        existing_data: Dict[str, Dict[str, pd.DataFrame]],
+        pairs: List[str] | None = None,
+    ) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """Incrementally merge the latest 1m/1h price ticks into existing H1, H4, D1, W1 DataFrames."""
+        return self.fetch_universe(pairs)
 
 
 class SyntheticProvider(MarketDataProvider):
@@ -154,6 +162,38 @@ class SyntheticProvider(MarketDataProvider):
             }
 
         return result
+
+    def update_live_bars(
+        self,
+        existing_data: Dict[str, Dict[str, pd.DataFrame]],
+        pairs: List[str] | None = None,
+    ) -> Dict[str, Dict[str, pd.DataFrame]]:
+        """Simulate a realistic 1-minute live price tick across all pairs when running in synthetic mode."""
+        if not existing_data:
+            return self.fetch_universe(pairs)
+        target_pairs = pairs or list(existing_data.keys())
+        self.seed += 1
+        rng = np.random.default_rng(self.seed)
+        updated: Dict[str, Dict[str, pd.DataFrame]] = {}
+        for pair in target_pairs:
+            tfs = existing_data.get(pair)
+            if not tfs or "H1" not in tfs:
+                continue
+            spec = UNIVERSE_MAP[pair]
+            vol = 0.00025 if spec.category != "Commodity" else 0.00045
+            shock = float(rng.normal(0.0, vol))
+            new_tfs: Dict[str, pd.DataFrame] = {}
+            for tf, df in tfs.items():
+                work = df.copy()
+                if not work.empty:
+                    last_c = float(work["Close"].iloc[-1])
+                    new_c = last_c * (1.0 + shock)
+                    work.iloc[-1, work.columns.get_loc("Close")] = new_c
+                    work.iloc[-1, work.columns.get_loc("High")] = max(float(work["High"].iloc[-1]), new_c)
+                    work.iloc[-1, work.columns.get_loc("Low")] = min(float(work["Low"].iloc[-1]), new_c)
+                new_tfs[tf] = work
+            updated[pair] = new_tfs
+        return updated
 
 
 def resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:

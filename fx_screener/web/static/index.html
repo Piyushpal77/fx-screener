@@ -944,8 +944,8 @@
         <span class="status-dot"></span>
         <span id="status-source">Loading...</span>
         <select id="sel-autorefresh" onchange="setAutoRefreshInterval(this.value)" style="background:transparent; border:none; color:var(--accent); font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; cursor:pointer; outline:none;" title="Auto-Refresh Interval during trading hours">
-          <option value="60" style="background:#0d131f;">Auto: 1m</option>
-          <option value="300" selected style="background:#0d131f;">Auto: 5m</option>
+          <option value="60" selected style="background:#0d131f;">Live: 1m</option>
+          <option value="300" style="background:#0d131f;">Auto: 5m</option>
           <option value="900" style="background:#0d131f;">Auto: 15m</option>
           <option value="0" style="background:#0d131f;">Auto: Off</option>
         </select>
@@ -1117,8 +1117,8 @@
     let showTradeLevels = true;
     let activeSubchart = "rsi";
     let lastChartPayload = null;
-    let autoRefreshSeconds = 300;
-    let countdownRemaining = 300;
+    let autoRefreshSeconds = 60;
+    let countdownRemaining = 60;
     let countdownTimerId = null;
 
     function startAutoRefreshCountdown() {
@@ -1138,7 +1138,7 @@
         }
         if (countdownRemaining <= 0) {
           countdownRemaining = autoRefreshSeconds;
-          await refreshMarketData();
+          await refreshMarketData(true);
         }
       }, 1000);
     }
@@ -1595,10 +1595,12 @@
       await loadPairChart(selectedPair, selectedTimeframe);
     }
 
-    async function loadPairChart(pair, tf) {
+    async function loadPairChart(pair, tf, preserveViewport = false) {
       const resp = await fetch(`/api/chart?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}&_t=${Date.now()}`);
       if (!resp.ok) return;
       const data = await resp.json();
+      const prevPayload = lastChartPayload;
+      const isSameChartView = preserveViewport && prevPayload && prevPayload.pair === pair && prevPayload.timeframe === tf;
       lastChartPayload = data;
 
       const pairMeta = screenerData.pairs.find(p => p.pair === pair);
@@ -1611,7 +1613,56 @@
           `<span class="signal-badge ${getSignalClass(pairMeta.signal)}">${pairMeta.signal} (${pairMeta.composite_score >= 0 ? '+' : ''}${pairMeta.composite_score.toFixed(1)})</span>`;
       }
 
-      // Remove previous pair's price lines BEFORE updating candle data so the y-axis doesn't stay stretched to the old pair's price scale
+      if (isSameChartView && data.candles && data.candles.length > 0) {
+        // Live incremental update: stream the latest bars into existing series WITHOUT resetting zoom/pan or Y-axis!
+        const savedLogicalRange = mainChart.timeScale().getVisibleLogicalRange();
+        const streamTail = (series, pts, visible = true) => {
+          if (!series) return;
+          if (!visible || !pts || pts.length === 0) return;
+          const tail = pts.slice(-2);
+          tail.forEach(pt => {
+            if (pt && pt.time !== undefined) {
+              try { series.update(pt); } catch (e) {}
+            }
+          });
+        };
+
+        streamTail(candleSeries, data.candles, true);
+        streamTail(hma9Series, data.hma9, showHMA);
+        streamTail(hma21Series, data.hma21, showHMA);
+        streamTail(ema20Series, data.ema20, showEMA);
+        streamTail(ema50Series, data.ema50, showEMA);
+        streamTail(ema200Series, data.ema200, showEMA);
+        streamTail(bbUpperSeries, data.bb_upper, showBB);
+        streamTail(bbLowerSeries, data.bb_lower, showBB);
+
+        streamTail(rsiSeries, data.rsi14, true);
+        streamTail(macdHistSeries, data.macd_hist, true);
+        streamTail(macdLineSeries, data.macd_line, true);
+        streamTail(macdSigSeries, data.macd_signal, true);
+
+        if (activeSubchart === "rsi") {
+          document.getElementById("subchart-title").textContent = `RSI (14) — Current: ${data.tf_summary.rsi14}`;
+        } else {
+          document.getElementById("subchart-title").textContent = `MACD (12, 26, 9) Histogram & Signal`;
+        }
+
+        drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
+        drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
+
+        if (savedLogicalRange) {
+          mainChart.timeScale().setVisibleLogicalRange(savedLogicalRange);
+          subChart.timeScale().setVisibleLogicalRange(savedLogicalRange);
+        }
+        setTimeout(updateEntryVerticalLinePosition, 20);
+
+        if (pairMeta) {
+          renderInspectorPanels(pairMeta, data);
+        }
+        return;
+      }
+
+      // Full chart switch (user clicked a new pair or changed timeframe)
       activePriceLines.forEach(line => {
         try { candleSeries.removePriceLine(line); } catch (e) {}
       });
@@ -2055,14 +2106,16 @@
       if (resp.ok) {
         screenerData = await resp.json();
         renderScreenerTable();
-        await loadPairChart(selectedPair, selectedTimeframe);
+        await loadPairChart(selectedPair, selectedTimeframe, true);
       }
     }
 
-    async function refreshMarketData() {
+    async function refreshMarketData(isAutoTick = false) {
       const btn = document.getElementById("btn-refresh");
-      btn.textContent = "⟳ Refreshing...";
-      btn.disabled = true;
+      if (!isAutoTick) {
+        btn.textContent = "⟳ Refreshing...";
+        btn.disabled = true;
+      }
       try {
         const resp = await fetch("/api/refresh", { method: "POST" });
         if (resp.ok) {
@@ -2072,11 +2125,14 @@
           renderCurrencyStrength();
           renderScreenerTable();
           renderTrackerTable();
-          await loadPairChart(selectedPair, selectedTimeframe);
+          // Stream new price into the active chart WITHOUT resetting zoom/scroll viewport
+          await loadPairChart(selectedPair, selectedTimeframe, true);
         }
       } finally {
-        btn.textContent = "⟳ Refresh Data";
-        btn.disabled = false;
+        if (!isAutoTick) {
+          btn.textContent = "⟳ Refresh Data";
+          btn.disabled = false;
+        }
       }
     }
 

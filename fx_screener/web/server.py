@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from fx_screener.config import AppConfig
-from fx_screener.data import load_or_fetch_universe
+from fx_screener.data import load_or_fetch_universe, update_live_universe
 from fx_screener.engine.indicators import (
     bollinger_bands,
     compute_indicators,
@@ -52,7 +52,12 @@ class WatchlistTogglePayload(BaseModel):
 
 
 class ScreenerWebState:
-    def __init__(self, config: AppConfig | None = None, tracker: SignalTracker | None = None) -> None:
+    def __init__(
+        self,
+        config: AppConfig | None = None,
+        tracker: SignalTracker | None = None,
+        start_worker: bool = True,
+    ) -> None:
         self.lock = threading.Lock()
         self.config = config or AppConfig.load()
         self.tracker = tracker or SignalTracker()
@@ -60,7 +65,36 @@ class ScreenerWebState:
         self.result: ScreenerResult | None = None
         self.tracked_signals: List[TrackedSignal] = []
         self.last_updated: str = "-"
+        self.last_refresh_epoch: float = 0.0
+        self._stop_event = threading.Event()
         self.refresh(force=False)
+        if start_worker and self.config.provider.active.lower() != "synthetic":
+            self._worker_thread = threading.Thread(
+                target=self._live_minute_worker, daemon=True, name="fx-live-1m-worker"
+            )
+            self._worker_thread.start()
+
+    def _live_minute_worker(self) -> None:
+        """Background daemon that updates live FX & Metal prices and recalculates scores every 60s."""
+        while not self._stop_event.wait(60.0):
+            try:
+                self.refresh_live_tick()
+            except Exception:
+                pass
+
+    def refresh_live_tick(self) -> None:
+        """Incrementally fetch 1-minute live price updates and recalculate all 31 instruments."""
+        new_data, source = update_live_universe(self.config, self.universe_data)
+        new_result = analyze_universe(new_data, self.config, source=source)
+        new_tracked = self.tracker.sync_and_evaluate(
+            new_result.pairs, new_data, source=source
+        )
+        with self.lock:
+            self.universe_data = new_data
+            self.result = new_result
+            self.tracked_signals = new_tracked
+            self.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.last_refresh_epoch = datetime.now().timestamp()
 
     def refresh(self, force: bool = False) -> None:
         with self.lock:
@@ -77,10 +111,10 @@ class ScreenerWebState:
             self.last_refresh_epoch = datetime.now().timestamp()
 
     def ensure_fresh(self) -> None:
-        ttl = max(30, int(self.config.provider.auto_refresh_seconds or 300))
+        ttl = max(30, int(self.config.provider.auto_refresh_seconds or 60))
         now_ts = datetime.now().timestamp()
         if getattr(self, "last_refresh_epoch", 0.0) + ttl <= now_ts:
-            self.refresh(force=True)
+            self.refresh_live_tick()
 
     def recompute(self) -> None:
         with self.lock:
@@ -90,7 +124,7 @@ class ScreenerWebState:
                 self.universe_data, self.config, source=self.result.source
             )
             self.tracked_signals = self.tracker.sync_and_evaluate(
-                self.result.pairs, self.universe_data, source=source
+                self.result.pairs, self.universe_data, source=self.result.source
             )
 
 
@@ -441,8 +475,11 @@ def create_web_app(
         }
 
     @app.post("/api/refresh")
-    def force_refresh() -> Dict[str, Any]:
-        state.refresh(force=True)
+    def force_refresh(full: bool = Query(False, description="Full history reload vs fast 1m live tick")) -> Dict[str, Any]:
+        if full:
+            state.refresh(force=True)
+        else:
+            state.refresh_live_tick()
         return get_screener()
 
     @app.post("/api/risk")
