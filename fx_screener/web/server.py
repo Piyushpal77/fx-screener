@@ -19,10 +19,14 @@ from fx_screener.data import load_or_fetch_universe, update_live_universe
 from fx_screener.engine.indicators import (
     bollinger_bands,
     compute_indicators,
+    compute_tpo_profile,
+    donchian_channels,
+    elliott_wave_oscillator,
     ema,
     hma,
     macd,
     rsi,
+    supertrend,
 )
 from fx_screener.engine.scorer import (
     PairAnalysis,
@@ -207,6 +211,20 @@ def _serialize_timeframe_score(tf_score: Any) -> Dict[str, Any]:
             "minus_di": round(ind.minus_di, 1),
             "rsi14": round(ind.rsi14, 1),
             "macd_hist": ind.macd_hist,
+            "macd_accel_d2": ind.macd_accel_d2,
+            "ewo": round(ind.ewo, 2),
+            "wave_bias": ind.wave_bias,
+            "donchian10_high": ind.donchian10_high,
+            "donchian10_low": ind.donchian10_low,
+            "donchian5_high": ind.donchian5_high,
+            "donchian5_low": ind.donchian5_low,
+            "supertrend_line": ind.supertrend_line,
+            "supertrend_dir": ind.supertrend_dir,
+            "tpo_poc": ind.tpo_poc,
+            "tpo_vah": ind.tpo_vah,
+            "tpo_val": ind.tpo_val,
+            "ttm_squeeze_on": ind.ttm_squeeze_on,
+            "ttm_squeeze_fired": ind.ttm_squeeze_fired,
             "atr14": ind.atr14,
             "atr_pct": round(ind.atr_pct, 2),
             "bb_width_pct_rank": round(ind.bb_width_pct_rank, 1),
@@ -231,6 +249,12 @@ def _serialize_pair(p: PairAnalysis) -> Dict[str, Any]:
         "hma_h4_boost": round(p.hma_h4_boost, 1),
         "hma_trigger": p.hma_trigger,
         "is_fresh_hma_entry": p.is_fresh_hma_entry,
+        "is_early_entry": p.is_early_entry,
+        "top_pick_rank": p.top_pick_rank,
+        "top_pick_label": p.top_pick_label,
+        "asap_exit_flag": p.asap_exit_flag,
+        "asap_exit_reason": p.asap_exit_reason,
+        "donchian5_trail_stop": round(p.donchian5_trail_stop, dec),
         "composite_score": round(p.composite_score, 1),
         "signal": p.signal,
         "confluence": p.confluence,
@@ -244,6 +268,7 @@ def _serialize_pair(p: PairAnalysis) -> Dict[str, Any]:
             "momentum": round(p.pillar_momentum, 1),
             "volatility": round(p.pillar_volatility, 1),
         },
+        "h1": _serialize_timeframe_score(p.h1) if p.h1 else None,
         "h4": _serialize_timeframe_score(p.h4),
         "d1": _serialize_timeframe_score(p.d1),
         "w1": _serialize_timeframe_score(p.w1),
@@ -398,9 +423,14 @@ def create_web_app(
         ema200_s = ema(close_s, min(200, max(20, len(close_s))))
         hma9_s = hma(close_s, 9)
         hma21_s = hma(close_s, 21)
+        dc10_u, dc10_l, _ = donchian_channels(work, 10)
+        dc5_u, dc5_l, _ = donchian_channels(work, 5)
+        st_line_s, st_dir_s = supertrend(work, 10, 2.5)
         bb_u, bb_m, bb_l, _ = bollinger_bands(close_s, 20, 2.0)
         rsi_s = rsi(close_s, 14)
         macd_l, macd_sig, macd_h = macd(close_s, 12, 26, 9)
+        ewo_s = elliott_wave_oscillator(work, 5, 35)
+        tpo_poc, tpo_vah, tpo_val = compute_tpo_profile(work, lookback=60, num_bins=28)
 
         candles: List[Dict[str, Any]] = []
         ema20_pts: List[Dict[str, Any]] = []
@@ -408,12 +438,18 @@ def create_web_app(
         ema200_pts: List[Dict[str, Any]] = []
         hma9_pts: List[Dict[str, Any]] = []
         hma21_pts: List[Dict[str, Any]] = []
+        dc10_upper_pts: List[Dict[str, Any]] = []
+        dc10_lower_pts: List[Dict[str, Any]] = []
+        dc5_upper_pts: List[Dict[str, Any]] = []
+        dc5_lower_pts: List[Dict[str, Any]] = []
+        supertrend_pts: List[Dict[str, Any]] = []
         bb_upper_pts: List[Dict[str, Any]] = []
         bb_lower_pts: List[Dict[str, Any]] = []
         rsi_pts: List[Dict[str, Any]] = []
         macd_hist_pts: List[Dict[str, Any]] = []
         macd_line_pts: List[Dict[str, Any]] = []
         macd_sig_pts: List[Dict[str, Any]] = []
+        ewo_pts: List[Dict[str, Any]] = []
 
         seen_ts: set[int] = set()
         for idx, row in work.iterrows():
@@ -443,6 +479,27 @@ def create_web_app(
                 hma9_pts.append({"time": ts, "value": round(h9, dec)})
             if np.isfinite(h21):
                 hma21_pts.append({"time": ts, "value": round(h21, dec)})
+
+            d10u = float(dc10_u.loc[idx])
+            d10l = float(dc10_l.loc[idx])
+            d5u = float(dc5_u.loc[idx])
+            d5l = float(dc5_l.loc[idx])
+            stl = float(st_line_s.loc[idx])
+            std = int(st_dir_s.loc[idx])
+            if np.isfinite(d10u) and np.isfinite(d10l):
+                dc10_upper_pts.append({"time": ts, "value": round(d10u, dec)})
+                dc10_lower_pts.append({"time": ts, "value": round(d10l, dec)})
+            if np.isfinite(d5u) and np.isfinite(d5l):
+                dc5_upper_pts.append({"time": ts, "value": round(d5u, dec)})
+                dc5_lower_pts.append({"time": ts, "value": round(d5l, dec)})
+            if np.isfinite(stl):
+                supertrend_pts.append(
+                    {
+                        "time": ts,
+                        "value": round(stl, dec),
+                        "color": "#10b981" if std >= 0 else "#ef4444",
+                    }
+                )
 
             bu = float(bb_u.loc[idx])
             bl = float(bb_l.loc[idx])
@@ -476,6 +533,18 @@ def create_web_app(
                 macd_hist_pts.append({"time": ts})
                 macd_line_pts.append({"time": ts})
                 macd_sig_pts.append({"time": ts})
+
+            ew_val = float(ewo_s.loc[idx])
+            if np.isfinite(ew_val):
+                ewo_pts.append(
+                    {
+                        "time": ts,
+                        "value": round(ew_val, 3),
+                        "color": "rgba(16, 185, 129, 0.80)" if ew_val >= 0 else "rgba(239, 68, 68, 0.80)",
+                    }
+                )
+            else:
+                ewo_pts.append({"time": ts})
 
         # Compute on-the-fly timeframe snapshot & pillar breakdown for H1/H4/D1/W1
         snap = compute_indicators(work)
@@ -519,10 +588,20 @@ def create_web_app(
                 "ravi": round(snap.ravi, 2),
                 "vhf14": round(snap.vhf14, 2),
                 "chop14": round(snap.chop14, 1),
+                "ewo": round(snap.ewo, 2),
+                "macd_accel_d2": round(snap.macd_accel_d2, 6),
+                "tpo_poc": round(tpo_poc, dec),
+                "tpo_vah": round(tpo_vah, dec),
+                "tpo_val": round(tpo_val, dec),
                 "adx14": round(snap.adx14, 1),
                 "atr14": round(snap.atr14, dec),
                 "atr_pips": round(snap.atr14 / spec.pip_size, 1),
                 "vol_regime": snap.vol_regime,
+            },
+            "tpo_levels": {
+                "poc": round(tpo_poc, dec),
+                "vah": round(tpo_vah, dec),
+                "val": round(tpo_val, dec),
             },
             "trade_plan": _serialize_pair(pair_obj)["trade_plan"] if pair_obj else None,
             "tracked_signals": pair_tracked,
@@ -532,12 +611,18 @@ def create_web_app(
             "ema200": ema200_pts,
             "hma9": hma9_pts,
             "hma21": hma21_pts,
+            "dc10_upper": dc10_upper_pts,
+            "dc10_lower": dc10_lower_pts,
+            "dc5_upper": dc5_upper_pts,
+            "dc5_lower": dc5_lower_pts,
+            "supertrend": supertrend_pts,
             "bb_upper": bb_upper_pts,
             "bb_lower": bb_lower_pts,
             "rsi14": rsi_pts,
             "macd_hist": macd_hist_pts,
             "macd_line": macd_line_pts,
             "macd_signal": macd_sig_pts,
+            "ewo": ewo_pts,
         }
 
     @app.post("/api/refresh")

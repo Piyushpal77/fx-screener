@@ -1,2 +1,5 @@
-Trade Suggested,Date of Recommendation,Entry Price,Target Price (TP2),Stop Loss Price,Current 4H Price,Outcome / Status,Date Reached
-EUR/CAD — STRONG SELL (SHORT),2026-11-27 08:00 UTC,1.56133,1.53995,1.57202,1.56105,In Progress (Tracking 4H),-
+Trade Suggested,Date of Recommendation,Entry Price,Target Price (TP2),Stop Loss Price,Live Price,Outcome / Status,Date Reached
+EUR/USD — ★ EARLY SELL (SHORT),2026-11-27 12:00 UTC,1.09541,1.07684,1.10469,1.09529,In Progress (Live Tracking),-
+EUR/GBP — ★ EARLY SELL (SHORT),2026-11-27 08:00 UTC,0.83511,0.82731,0.83901,0.83457,In Progress (Live Tracking),-
+USD/JPY — ★ EARLY BUY (LONG),2026-11-27 08:00 UTC,159.534,162.048,158.277,159.554,In Progress (Live Tracking),-
+EUR/CAD — STRONG SELL (SHORT),2026-11-27 08:00 UTC,1.56133,1.53995,1.57202,1.55919,In Progress (Live Tracking),-

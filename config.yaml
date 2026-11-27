@@ -8,14 +8,14 @@ provider:
     environment: practice
 scoring:
   timeframe_weights:
-    D1: 0.5
-    H4: 0.3
-    W1: 0.2
+    H4: 0.45
+    D1: 0.40
+    W1: 0.15
   pillar_weights:
-    trend: 0.35
-    strength: 0.25
-    momentum: 0.25
-    volatility: 0.15
+    trend: 0.45
+    momentum: 0.30
+    strength: 0.15
+    volatility: 0.10
   thresholds:
     strong_buy: 60.0
     buy: 25.0

@@ -14,17 +14,17 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
 
 @dataclass
 class TimeframeWeights:
-    D1: float = 0.50
-    H4: float = 0.30
-    W1: float = 0.20
+    H4: float = 0.45
+    D1: float = 0.40
+    W1: float = 0.15
 
 
 @dataclass
 class PillarWeights:
-    trend: float = 0.35
-    strength: float = 0.25
-    momentum: float = 0.25
-    volatility: float = 0.15
+    trend: float = 0.45
+    momentum: float = 0.30
+    strength: float = 0.15
+    volatility: float = 0.10
 
 
 @dataclass
@@ -89,17 +89,17 @@ class AppConfig:
         scoring_raw = raw.get("scoring", {}) or {}
         tf_raw = scoring_raw.get("timeframe_weights", {}) or {}
         tf_weights = TimeframeWeights(
-            D1=float(tf_raw.get("D1", 0.50)),
-            H4=float(tf_raw.get("H4", 0.30)),
-            W1=float(tf_raw.get("W1", 0.20)),
+            H4=float(tf_raw.get("H4", 0.45)),
+            D1=float(tf_raw.get("D1", 0.40)),
+            W1=float(tf_raw.get("W1", 0.15)),
         )
 
         pw_raw = scoring_raw.get("pillar_weights", {}) or {}
         pillar_weights = PillarWeights(
-            trend=float(pw_raw.get("trend", 0.35)),
-            strength=float(pw_raw.get("strength", 0.25)),
-            momentum=float(pw_raw.get("momentum", 0.25)),
-            volatility=float(pw_raw.get("volatility", 0.15)),
+            trend=float(pw_raw.get("trend", 0.45)),
+            momentum=float(pw_raw.get("momentum", 0.30)),
+            strength=float(pw_raw.get("strength", 0.15)),
+            volatility=float(pw_raw.get("volatility", 0.10)),
         )
 
         th_raw = scoring_raw.get("thresholds", {}) or {}

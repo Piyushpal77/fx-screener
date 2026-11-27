@@ -74,11 +74,13 @@ def format_score_text(score: float) -> Text:
 def format_signal_badge(signal: str) -> Text:
     styles = {
         "STRONG BUY": "bold black on bright_green",
+        "★ EARLY BUY": "bold bright_cyan",
         "BUY": "bold bright_green",
         "BUY (PULLBACK)": "bold yellow",
         "NEUTRAL": "dim white",
         "SELL (PULLBACK)": "bold yellow",
         "SELL": "bold bright_red",
+        "★ EARLY SELL": "bold bright_magenta",
         "STRONG SELL": "bold white on red",
     }
     return Text(f" {signal:^15} ", style=styles.get(signal, "white"))
@@ -91,12 +93,18 @@ def filter_pairs(
 ) -> List[PairAnalysis]:
     out = list(pairs)
     mode = (filter_mode or "all").lower()
-    if mode == "hma_turn":
+    if mode == "top5":
+        out = [p for p in out if p.top_pick_rank != 0]
+    elif mode == "early":
+        out = [p for p in out if p.is_early_entry or "EARLY" in p.signal]
+    elif mode == "exit_alerts":
+        out = [p for p in out if p.asap_exit_flag]
+    elif mode == "hma_turn":
         out = [p for p in out if "TURN" in p.hma_trigger]
     elif mode == "confluence":
         out = [p for p in out if p.confluence]
-    if mode == "strong":
-        out = [p for p in out if p.signal in ("STRONG BUY", "STRONG SELL")]
+    elif mode == "strong":
+        out = [p for p in out if p.signal in ("STRONG BUY", "STRONG SELL", "★ EARLY BUY", "★ EARLY SELL")]
     elif mode == "squeeze":
         out = [p for p in out if "SQUEEZE" in p.vol_regime or "BREAKOUT" in p.vol_regime]
     elif mode == "watchlist":

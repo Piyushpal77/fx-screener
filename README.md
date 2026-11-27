@@ -12,14 +12,15 @@ Built with **Textual** (interactive TUI dashboard) and **Rich** (one-shot CLI & 
    - **7 G8 Majors**: `EUR/USD`, `GBP/USD`, `USD/JPY`, `USD/CHF`, `AUD/USD`, `USD/CAD`, `NZD/USD`
    - **21 G8 Minor Crosses**: All cross combinations of `EUR`, `GBP`, `AUD`, `NZD`, `CAD`, `CHF`, `JPY`
    - **2 Precious Metals**: `XAU/USD` (Gold) and `XAG/USD` (Silver)
-2. **Weighted 4-Pillar Composite Score (`-100` to `+100`)**:
-   - **Trend (35%)**: Fast/Slow Hull Moving Averages (`HMA 9`, `HMA 21`), `EMA 20/50/200` stack alignment, `DI+/DI-`, and a zero-lag **Early Trend Efficiency Conviction Multiplier** combining `DX(14)` (unsmoothed Wilder Directional Index), `RAVI(7, 65)` (Chande Range Action Verification Index), `VHF(14)` (Vertical Horizontal Filter), and `CHOP(14)` (Dreiss Choppiness Index).
-   - **Currency Strength (25%)**: True G8 relative strength matrix (`-100` to `+100`) computed across all 28 pairs, scoring each pair by `Base Score - Quote Score`.
-   - **Momentum (25%)**: `RSI(14)` directional momentum zones + `MACD(12, 26, 9)` histogram impulse & signal crossover.
-   - **Volatility & Structure (15%)**: `Bollinger Bands(20, 2)` bandwidth percentile rank (`SQUEEZE` / `BREAKOUT`) and `ATR(14)` expansion ratio.
-3. **Swing-Centric Multi-Timeframe Confluence**:
-   - Combines `D1` (**50%**), `H4` (**30%**), and `W1` (**20%**).
-   - Flags `★ BULL ALIGNED` or `★ BEAR ALIGNED` when all three timeframes align directionally (`>= +20` or `<= -20`).
+2. **Weighted 4-Pillar Composite Score (`-100` to `+100`) — `Fx_Screener2` Early-Inflection Model**:
+   - **Early Trend & Fast Breakout (45%)**: Fast `Donchian(10)` Entry + `Donchian(5)` Trailing Exit Channel, Fast/Slow Hull Moving Averages (`HMA 9`, `HMA 21`), `SuperTrend(10, 2.5)`, `EMA 20/50/200` stack, `DI+/DI-`, and FX-calibrated **Early Trend Efficiency Multiplier** (`35% DX(14) + 25% RAVI(7, 65) + 20% VHF(14) + 20% Inverted CHOP(14)`).
+   - **Momentum Acceleration & Elliott Wave (30%)**: 2nd-Derivative `MACD Δ²H` (`Hist_t - 2*Hist_{t-1} + Hist_{t-2}`), `EWO(5, 35)` Elliott Wave Oscillator, Causal `ATR-ZigZag` Wave 1-2-3 structure, and Constance Brown `RSI(14)` regimes.
+   - **Currency Strength (15%)**: True G8 relative strength matrix (`-100` to `+100`) computed across all 28 pairs (`Base Score - Quote Score`).
+   - **TPO Value Area & Squeeze (10%)**: Steidlmayer TPO Market Profile (`VAH`, `POC`, `VAL` 70% value area) + **TTM Squeeze** (`Bollinger(20, 2.0)` inside `Keltner(20, 1.5x ATR)`).
+3. **Fast Intraday-to-Swing Confluence & 4-Trigger ASAP Exit Engine**:
+   - Combines `H4` (**45%**), `D1` (**40%**), and `W1` (**15%**), plus **`⚡ EARLY ENTRY` (`H1 + H4 + D1`)** to catch breakouts before `W1` lags.
+   - **4-Trigger ASAP Exit Engine (`⚠ EXIT NOW`)**: Alerts immediately when an open trade hits (1) `H4 HMA(9/21)` reversal, (2) `Donchian(5)` trailing channel break after `+0.75R`, (3) Momentum Exhaustion climax at `>= +1.2R` (`MACD Δ²H` + `RAVI` contraction), or (4) Hard `SL` / `TP2`.
+   - **`🧹 Clean Chart` Mode**: One-click button in the Web UI to hide all indicator/level overlays for a pure logarithmic candlestick view.
 4. **ATR Trade Planner & Cross-Currency Position Sizer**:
    - Computes Entry, `1.5 × ATR` Stop Loss (in price and pips), and `1.5R`, `2.0R`, `3.0R` Take-Profit levels.
    - Converts quote-currency pip values back to `USD` across majors, `USD/XXX`, cross pairs (e.g. `GBP/JPY`, `EUR/AUD`), and metals (`XAU/USD`, `XAG/USD`) to output exact **Standard Lots** and **Units** for your account balance and risk % (`$10,000 @ 1.0%` default).

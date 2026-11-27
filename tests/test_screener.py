@@ -44,8 +44,19 @@ def test_synthetic_provider_and_indicators() -> None:
         assert snap_d1.ravi >= 0.0
         assert 0.0 <= snap_d1.vhf14 <= 1.0
         assert 0.0 <= snap_d1.chop14 <= 100.0
+        assert snap_d1.donchian10_high >= snap_d1.donchian10_low > 0
+        assert snap_d1.donchian5_high >= snap_d1.donchian5_low > 0
+        assert snap_d1.supertrend_dir in (-1, 1)
+        assert snap_d1.tpo_vah >= snap_d1.tpo_poc >= snap_d1.tpo_val > 0
         assert snap_d1.atr14 > 0
-        assert snap_d1.vol_regime in {"SQUEEZE", "BREAKOUT", "EXPANDING", "NORMAL"}
+        assert snap_d1.vol_regime in {
+            "TTM SQUEEZE",
+            "SQUEEZE FIRE",
+            "SQUEEZE",
+            "BREAKOUT",
+            "EXPANDING",
+            "NORMAL",
+        }
 
 
 def test_analyze_universe_scoring_and_strength_matrix() -> None:
@@ -75,15 +86,18 @@ def test_analyze_universe_scoring_and_strength_matrix() -> None:
         assert abs(p.composite_score - expected_comp) < 1e-4
         assert p.signal in {
             "STRONG BUY",
+            "★ EARLY BUY",
             "BUY",
             "BUY (PULLBACK)",
             "NEUTRAL",
             "SELL (PULLBACK)",
             "SELL",
+            "★ EARLY SELL",
             "STRONG SELL",
         }
         assert p.h4.indicators.hma9 > 0
         assert p.h4.indicators.hma21 > 0
+        assert p.donchian5_trail_stop > 0
 
 
 def test_cross_currency_pip_values_and_trade_planner() -> None:
@@ -247,3 +261,37 @@ def test_h4_strong_signal_tracker_and_csv_spreadsheet(tmp_path: Path) -> None:
     assert closed_sig.pnl_r >= 1.9
     summary = tracker.summary_stats(updated_signals)
     assert summary["win_count"] >= 1
+
+
+def test_asap_early_exit_engine_triggers(tmp_path: Path) -> None:
+    from fx_screener.engine.tracker import SignalTracker
+
+    db_file = tmp_path / "asap_exit_test.sqlite3"
+    csv_file = tmp_path / "asap_exit_test.csv"
+    tracker = SignalTracker(db_path=db_file, csv_path=csv_file)
+
+    cfg = AppConfig()
+    cfg.thresholds.strong_buy = 20.0
+    data = SyntheticProvider(seed=42).fetch_universe()
+    res = analyze_universe(data, cfg, source="synthetic")
+
+    long_pair = next(p for p in res.pairs if p.composite_score >= 25.0)
+    long_pair.signal = "STRONG BUY"
+    long_pair.is_fresh_hma_entry = True
+    long_pair.hma_trigger = "⚡ H4 DONCHIAN(10) BULL BRK"
+
+    signals = tracker.sync_and_evaluate([long_pair], data, source="synthetic", allow_synthetic=True)
+    assert len(signals) == 1
+    sig = signals[0]
+    assert sig.status == "ACTIVE"
+
+    # Simulate live H4 HMA(9/21) reversal against Long BEFORE hard stop-loss is reached
+    mid_loss_price = sig.entry_price - 0.35 * (sig.entry_price - sig.stop_loss_price)
+    long_pair.price = mid_loss_price
+    long_pair.h4.indicators.hma21 = sig.entry_price + 0.0010
+    long_pair.h4.indicators.hma9 = sig.entry_price - 0.0005
+    long_pair.h4.indicators.hma9_prev = sig.entry_price + 0.0005
+
+    updated = tracker.sync_and_evaluate([long_pair], data, source="synthetic", allow_synthetic=True)
+    assert updated[0].asap_exit_alert is True
+    assert "EXIT NOW" in updated[0].asap_exit_reason

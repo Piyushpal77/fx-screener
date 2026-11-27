@@ -87,17 +87,17 @@ class PairInspectorWidget(Static):
         # 4-Pillar Multi-Timeframe Matrix
         pillar_tbl = Table(box=None, expand=True, pad_edge=False, header_style="bold cyan")
         pillar_tbl.add_column("Pillar (Wt)", width=15)
-        pillar_tbl.add_column("H4 (30%)", justify="right", width=8)
-        pillar_tbl.add_column("D1 (50%)", justify="right", width=8)
-        pillar_tbl.add_column("W1 (20%)", justify="right", width=8)
+        pillar_tbl.add_column("H4 (45%)", justify="right", width=8)
+        pillar_tbl.add_column("D1 (40%)", justify="right", width=8)
+        pillar_tbl.add_column("W1 (15%)", justify="right", width=8)
         pillar_tbl.add_column("Comp", justify="right", width=8)
         pillar_tbl.add_column("Bar", width=13)
 
         rows = [
-            ("Trend (35%)", analysis.h4.trend_score, analysis.d1.trend_score, analysis.w1.trend_score, analysis.pillar_trend),
-            ("Strength (25%)", analysis.h4.strength_score, analysis.d1.strength_score, analysis.w1.strength_score, analysis.pillar_strength),
-            ("Momentum (25%)", analysis.h4.momentum_score, analysis.d1.momentum_score, analysis.w1.momentum_score, analysis.pillar_momentum),
-            ("Volatility (15%)", analysis.h4.volatility_score, analysis.d1.volatility_score, analysis.w1.volatility_score, analysis.pillar_volatility),
+            ("Trend (45%)", analysis.h4.trend_score, analysis.d1.trend_score, analysis.w1.trend_score, analysis.pillar_trend),
+            ("Momentum (30%)", analysis.h4.momentum_score, analysis.d1.momentum_score, analysis.w1.momentum_score, analysis.pillar_momentum),
+            ("Strength (15%)", analysis.h4.strength_score, analysis.d1.strength_score, analysis.w1.strength_score, analysis.pillar_strength),
+            ("TPO/Vol (10%)", analysis.h4.volatility_score, analysis.d1.volatility_score, analysis.w1.volatility_score, analysis.pillar_volatility),
             ("TOTAL SCORE", analysis.h4.total_score, analysis.d1.total_score, analysis.w1.total_score, analysis.composite_score),
         ]
         for label, h4_v, d1_v, w1_v, comp_v in rows:
