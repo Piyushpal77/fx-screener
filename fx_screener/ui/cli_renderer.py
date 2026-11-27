@@ -182,7 +182,7 @@ def render_cli_once(
     table.add_column("D1", justify="right", no_wrap=True)
     table.add_column("W1", justify="right", no_wrap=True)
     table.add_column("Confluence", justify="center", no_wrap=True)
-    table.add_column("ADX", justify="right", no_wrap=True)
+    table.add_column("DX/RAVI", justify="right", no_wrap=True)
     table.add_column("RSI", justify="right", no_wrap=True)
     table.add_column("Regime", justify="center", no_wrap=True)
     table.add_column("Trade Plan (1% Risk)", justify="left", no_wrap=True)
@@ -218,7 +218,7 @@ def render_cli_once(
             format_score_text(p.d1.total_score),
             format_score_text(p.w1.total_score),
             Text(p.confluence_label, style=conf_style),
-            f"{p.d1.indicators.adx14:.1f}",
+            f"{p.d1.indicators.dx14:.0f}/{p.d1.indicators.ravi:.1f}%",
             f"{p.d1.indicators.rsi14:.1f}",
             Text(p.vol_regime, style=vol_style),
             plan_str,
@@ -258,6 +258,10 @@ def export_screener_results(
                 "pillar_strength": round(p.pillar_strength, 2),
                 "pillar_momentum": round(p.pillar_momentum, 2),
                 "pillar_volatility": round(p.pillar_volatility, 2),
+                "dx_d1": round(p.d1.indicators.dx14, 2),
+                "ravi_d1": round(p.d1.indicators.ravi, 2),
+                "vhf_d1": round(p.d1.indicators.vhf14, 2),
+                "chop_d1": round(p.d1.indicators.chop14, 2),
                 "adx_d1": round(p.d1.indicators.adx14, 2),
                 "rsi_d1": round(p.d1.indicators.rsi14, 2),
                 "vol_regime": p.vol_regime,

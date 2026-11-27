@@ -182,7 +182,7 @@ class FxScreenerApp(App):
         ("abs_composite", "Conviction |Score|"),
         ("d1", "D1 Score"),
         ("h4", "H4 Score"),
-        ("adx", "ADX(D1)"),
+        ("dx", "DX(14) / RAVI"),
         ("change", "D1 Change%"),
     ]
 
@@ -224,7 +224,7 @@ class FxScreenerApp(App):
             "D1",
             "W1",
             "Confluence",
-            "ADX",
+            "DX/RAVI",
             "RSI",
             "Regime",
         )
@@ -278,8 +278,8 @@ class FxScreenerApp(App):
             return sorted(pairs, key=lambda p: p.d1.total_score, reverse=True)
         if key_name == "h4":
             return sorted(pairs, key=lambda p: p.h4.total_score, reverse=True)
-        if key_name == "adx":
-            return sorted(pairs, key=lambda p: p.d1.indicators.adx14, reverse=True)
+        if key_name in ("dx", "adx"):
+            return sorted(pairs, key=lambda p: p.d1.indicators.dx14, reverse=True)
         if key_name == "change":
             return sorted(pairs, key=lambda p: p.change_d1_pct, reverse=True)
         return pairs
@@ -345,7 +345,7 @@ class FxScreenerApp(App):
                 format_score_text(p.d1.total_score),
                 format_score_text(p.w1.total_score),
                 Text(p.confluence_label, style=conf_style),
-                f"{p.d1.indicators.adx14:.1f}",
+                f"{p.d1.indicators.dx14:.0f}/{p.d1.indicators.ravi:.1f}%",
                 f"{p.d1.indicators.rsi14:.1f}",
                 Text(p.vol_regime, style=vol_style),
                 key=p.spec.pair,

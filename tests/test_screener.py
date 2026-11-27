@@ -40,6 +40,10 @@ def test_synthetic_provider_and_indicators() -> None:
         snap_d1 = compute_indicators(data[pair]["D1"])
         assert snap_d1.close > 0
         assert 0.0 <= snap_d1.rsi14 <= 100.0
+        assert 0.0 <= snap_d1.dx14 <= 100.0
+        assert snap_d1.ravi >= 0.0
+        assert 0.0 <= snap_d1.vhf14 <= 1.0
+        assert 0.0 <= snap_d1.chop14 <= 100.0
         assert snap_d1.atr14 > 0
         assert snap_d1.vol_regime in {"SQUEEZE", "BREAKOUT", "EXPANDING", "NORMAL"}
 
@@ -206,7 +210,7 @@ def test_h4_strong_signal_tracker_and_csv_spreadsheet(tmp_path: Path) -> None:
     strong_candidates[0].is_fresh_hma_entry = True
     strong_candidates[0].hma_trigger = "★ H4 HMA TURN BULL" if strong_candidates[0].signal == "STRONG BUY" else "★ H4 HMA TURN BEAR"
 
-    signals = tracker.sync_and_evaluate(res.pairs, data)
+    signals = tracker.sync_and_evaluate(res.pairs, data, source="synthetic", allow_synthetic=True)
     assert len(signals) > 0
     assert csv_file.exists()
     header_line = csv_file.read_text(encoding="utf-8").splitlines()[0]
@@ -229,7 +233,7 @@ def test_h4_strong_signal_tracker_and_csv_spreadsheet(tmp_path: Path) -> None:
         )
 
     data[first.pair]["H4"] = pd.concat([h4_df, new_bar])
-    updated_signals = tracker.sync_and_evaluate(res.pairs, data)
+    updated_signals = tracker.sync_and_evaluate(res.pairs, data, source="synthetic", allow_synthetic=True)
     closed_sig = next(s for s in updated_signals if s.id == first.id)
     assert closed_sig.status == "WIN_TP2"
     assert closed_sig.tp1_hit is True

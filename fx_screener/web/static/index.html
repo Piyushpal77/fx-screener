@@ -1003,7 +1003,7 @@
               <th onclick="setSort('d1')" style="text-align:right;">D1</th>
               <th onclick="setSort('w1')" style="text-align:right;">W1</th>
               <th onclick="setSort('confluence')" style="text-align:center;">Confluence</th>
-              <th onclick="setSort('adx')" style="text-align:right;">ADX</th>
+              <th onclick="setSort('dx')" style="text-align:right;" title="Unsmoothed Wilder DX(14) + Chande RAVI(7,65) + VHF(14) + CHOP(14)">DX / RAVI</th>
               <th onclick="setSort('rsi')" style="text-align:right;">RSI</th>
               <th style="text-align:center;">Regime</th>
             </tr>
@@ -1384,7 +1384,8 @@
           case "h4": va = a.h4.total_score; vb = b.h4.total_score; break;
           case "d1": va = a.d1.total_score; vb = b.d1.total_score; break;
           case "w1": va = a.w1.total_score; vb = b.w1.total_score; break;
-          case "adx": va = a.d1.indicators.adx14; vb = b.d1.indicators.adx14; break;
+          case "dx":
+          case "adx": va = a.d1.indicators.dx14; vb = b.d1.indicators.dx14; break;
           case "rsi": va = a.d1.indicators.rsi14; vb = b.d1.indicators.rsi14; break;
           case "confluence": va = a.confluence ? 1 : 0; vb = b.confluence ? 1 : 0; break;
           case "watchlist": va = a.is_watchlist ? 1 : 0; vb = b.is_watchlist ? 1 : 0; break;
@@ -1470,7 +1471,7 @@
             <td style="text-align:right;">${formatScoreCell(p.d1.total_score)}</td>
             <td style="text-align:right;">${formatScoreCell(p.w1.total_score)}</td>
             <td style="text-align:center;"><span class="conf-badge ${confClass}">${p.confluence_label}</span></td>
-            <td class="mono" style="text-align:right;">${p.d1.indicators.adx14.toFixed(1)}</td>
+            <td class="mono" style="text-align:right;" title="DX(14): ${p.d1.indicators.dx14.toFixed(1)} | RAVI: ${p.d1.indicators.ravi.toFixed(2)}% | VHF: ${p.d1.indicators.vhf14.toFixed(2)} | CHOP: ${p.d1.indicators.chop14.toFixed(1)}">${p.d1.indicators.dx14.toFixed(0)} <span style="color:var(--text-dim); font-size:10.5px;">/${p.d1.indicators.ravi.toFixed(1)}%</span></td>
             <td class="mono" style="text-align:right;">${p.d1.indicators.rsi14.toFixed(1)}</td>
             <td style="text-align:center;"><span class="regime-badge ${regClass}">${p.vol_regime}</span></td>
           </tr>
@@ -1856,7 +1857,7 @@
         `${chartData.timeframe} Score: ${formatScoreCell(tfs.total_score)} &nbsp;|&nbsp; MTF: ${formatScoreCell(pairMeta.composite_score)}`;
 
       const pillars = [
-        { name: "Trend (HMA 9/21 + EMA 50/200 + ADX)", weight: "35%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
+        { name: `Trend (HMA 9/21 + DX:${tfs.dx14} RAVI:${tfs.ravi}% CHOP:${tfs.chop14})`, weight: "35%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
         { name: "G8 Currency Strength Diff", weight: "25%", val: pairMeta.pillars.strength, tfVal: tfs.strength_score },
         { name: "Momentum (RSI 14 + MACD)", weight: "25%", val: pairMeta.pillars.momentum, tfVal: tfs.momentum_score },
         { name: "Volatility (BB + ATR Regime)", weight: "15%", val: pairMeta.pillars.volatility, tfVal: tfs.volatility_score },

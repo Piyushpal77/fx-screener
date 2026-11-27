@@ -1,4 +1,4 @@
-"""Vectorized technical indicators for the FX Screener (HMA, EMA, ADX, RSI, MACD, Bollinger, ATR)."""
+"""Vectorized technical indicators for the FX Screener (HMA, EMA, DX/RAVI/VHF/CHOP, RSI, MACD, Bollinger, ATR)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,12 @@ class IndicatorSnapshot:
     hma_bull_cross: bool      # True if HMA(9) crossed above HMA(21) or turned bullish within last 2 bars
     hma_bear_cross: bool      # True if HMA(9) crossed below HMA(21) or turned bearish within last 2 bars
     hma_status: str           # "HMA TURN BULL" | "HMA BULL" | "HMA TURN BEAR" | "HMA BEAR" | "HMA FLAT"
-    adx14: float
+    dx14: float               # Raw unsmoothed Wilder Directional Index DX(14) (0..100, zero secondary smoothing lag)
+    ravi: float               # Chande Range Action Verification Index RAVI(7, 65) (%)
+    ravi_rising: bool         # True if RAVI is expanding compared to 2 bars ago
+    vhf14: float              # White Vertical Horizontal Filter VHF(14) (0..1)
+    chop14: float             # Dreiss Choppiness Index CHOP(14) (0..100; <38.2 strong trend, >61.8 chop)
+    adx14: float              # Legacy smoothed ADX(14) retained for reference
     plus_di: float
     minus_di: float
     rsi14: float
@@ -114,7 +119,13 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return tr.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean().bfill()
 
 
-def adx(df: pd.DataFrame, period: int = 14) -> tuple[pd.Series, pd.Series, pd.Series]:
+def directional_movement(
+    df: pd.DataFrame, period: int = 14
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+    """Compute raw unsmoothed DX(14), smoothed ADX(14), +DI(14), and -DI(14).
+
+    DX(14) stops before Wilder's second 14-period smoothing stage, eliminating double-smoothing lag.
+    """
     high = df["High"]
     low = df["Low"]
     up_move = high.diff()
@@ -134,9 +145,49 @@ def adx(df: pd.DataFrame, period: int = 14) -> tuple[pd.Series, pd.Series, pd.Se
     minus_di = 100.0 * (minus_dm.ewm(alpha=1.0 / period, adjust=False).mean() / atr_s)
 
     di_sum = (plus_di + minus_di).replace(0.0, np.nan)
-    dx = 100.0 * ((plus_di - minus_di).abs() / di_sum)
-    adx_s = dx.ewm(alpha=1.0 / period, adjust=False).mean().fillna(20.0)
-    return adx_s, plus_di.fillna(20.0), minus_di.fillna(20.0)
+    dx_s = (100.0 * ((plus_di - minus_di).abs() / di_sum)).fillna(20.0)
+    adx_s = dx_s.ewm(alpha=1.0 / period, adjust=False).mean().fillna(20.0)
+    return dx_s, adx_s, plus_di.fillna(20.0), minus_di.fillna(20.0)
+
+
+def adx(df: pd.DataFrame, period: int = 14) -> tuple[pd.Series, pd.Series, pd.Series]:
+    _, adx_s, plus_di, minus_di = directional_movement(df, period)
+    return adx_s, plus_di, minus_di
+
+
+def ravi(series: pd.Series, short_period: int = 7, long_period: int = 65) -> pd.Series:
+    """Tushar Chande's Range Action Verification Index: RAVI = 100 * |SMA(7) - SMA(65)| / SMA(65)."""
+    eff_long = min(long_period, max(short_period + 2, len(series)))
+    sma_short = series.rolling(short_period, min_periods=2).mean()
+    sma_long = series.rolling(eff_long, min_periods=5).mean().replace(0.0, np.nan)
+    out = 100.0 * ((sma_short - sma_long).abs() / sma_long)
+    return out.fillna(0.0)
+
+
+def vhf(series: pd.Series, period: int = 14) -> pd.Series:
+    """Adam White's Vertical Horizontal Filter: VHF = (MaxClose_n - MinClose_n) / Sum(|Close_i - Close_{i-1}|)."""
+    hcp = series.rolling(period, min_periods=3).max()
+    lcp = series.rolling(period, min_periods=3).min()
+    net_range = (hcp - lcp).abs()
+    path_length = series.diff().abs().rolling(period, min_periods=3).sum().replace(0.0, np.nan)
+    out = (net_range / path_length).clip(lower=0.0, upper=1.0)
+    return out.fillna(0.35)
+
+
+def choppiness_index(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """E.W. Dreiss Choppiness Index (0..100): CHOP = 100 * log10(Sum(TR, n) / (MaxHigh_n - MinLow_n)) / log10(n).
+
+    Values < 38.2 indicate strong linear trend; values > 61.8 indicate sideways chop/consolidation.
+    """
+    tr = true_range(df)
+    sum_tr = tr.rolling(period, min_periods=3).sum()
+    max_high = df["High"].rolling(period, min_periods=3).max()
+    min_low = df["Low"].rolling(period, min_periods=3).min()
+    hl_range = (max_high - min_low).replace(0.0, np.nan)
+    ratio = (sum_tr / hl_range).clip(lower=1.0)
+    denom = math.log10(max(2, period))
+    chop = 100.0 * (np.log10(ratio) / denom)
+    return chop.clip(lower=0.0, upper=100.0).fillna(50.0)
 
 
 def bollinger_bands(
@@ -213,7 +264,14 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorSnapshot:
     else:
         hma_status = "HMA FLAT"
 
-    adx_s, plus_di_s, minus_di_s = adx(df, 14)
+    dx_s, adx_s, plus_di_s, minus_di_s = directional_movement(df, 14)
+    ravi_s = ravi(close_s, 7, 65)
+    vhf_s = vhf(close_s, 14)
+    chop_s = choppiness_index(df, 14)
+    ravi_now = float(ravi_s.iloc[-1])
+    ravi_prev2 = float(ravi_s.iloc[-3]) if len(ravi_s) >= 3 else float(ravi_s.iloc[0])
+    ravi_rising = bool(ravi_now > ravi_prev2)
+
     rsi_s = rsi(close_s, 14)
     macd_l, macd_sig, macd_h = macd(close_s, 12, 26, 9)
     atr_s = atr(df, 14)
@@ -270,6 +328,11 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorSnapshot:
         hma_bull_cross=hma_bull_cross,
         hma_bear_cross=hma_bear_cross,
         hma_status=hma_status,
+        dx14=float(dx_s.iloc[-1]),
+        ravi=ravi_now,
+        ravi_rising=ravi_rising,
+        vhf14=float(vhf_s.iloc[-1]),
+        chop14=float(chop_s.iloc[-1]),
         adx14=float(adx_s.iloc[-1]),
         plus_di=float(plus_di_s.iloc[-1]),
         minus_di=float(minus_di_s.iloc[-1]),

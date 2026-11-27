@@ -13,7 +13,7 @@ Built with **Textual** (interactive TUI dashboard) and **Rich** (one-shot CLI & 
    - **21 G8 Minor Crosses**: All cross combinations of `EUR`, `GBP`, `AUD`, `NZD`, `CAD`, `CHF`, `JPY`
    - **2 Precious Metals**: `XAU/USD` (Gold) and `XAG/USD` (Silver)
 2. **Weighted 4-Pillar Composite Score (`-100` to `+100`)**:
-   - **Trend (35%)**: `EMA 20`, `EMA 50`, `EMA 200` stack alignment, `EMA 20` slope, `DI+/DI-`, and `ADX(14)` conviction multiplier.
+   - **Trend (35%)**: Fast/Slow Hull Moving Averages (`HMA 9`, `HMA 21`), `EMA 20/50/200` stack alignment, `DI+/DI-`, and a zero-lag **Early Trend Efficiency Conviction Multiplier** combining `DX(14)` (unsmoothed Wilder Directional Index), `RAVI(7, 65)` (Chande Range Action Verification Index), `VHF(14)` (Vertical Horizontal Filter), and `CHOP(14)` (Dreiss Choppiness Index).
    - **Currency Strength (25%)**: True G8 relative strength matrix (`-100` to `+100`) computed across all 28 pairs, scoring each pair by `Base Score - Quote Score`.
    - **Momentum (25%)**: `RSI(14)` directional momentum zones + `MACD(12, 26, 9)` histogram impulse & signal crossover.
    - **Volatility & Structure (15%)**: `Bollinger Bands(20, 2)` bandwidth percentile rank (`SQUEEZE` / `BREAKOUT`) and `ATR(14)` expansion ratio.
@@ -55,7 +55,7 @@ This starts the FastAPI + TradingView Lightweight Charts UI at `http://127.0.0.1
 | `4` | Filter **Volatility Squeeze / Breakout** |
 | `5` | Filter **Watchlist (`★`)** |
 | `/` | Search / Filter by Currency or Signal (e.g., `JPY`, `USD`, `XAU`, `BUY`) |
-| `S` | Cycle Sort Column (`Composite Score`, `|Score|`, `D1`, `H4`, `ADX`, `D1%`) |
+| `S` | Cycle Sort Column (`Composite Score`, `|Score|`, `D1`, `H4`, `DX(14)`, `D1%`) |
 | `W` | Toggle Watchlist star (`★`) on selected pair (saved to `config.yaml`) |
 | `A` | Toggle Trade Planner between `D1 ATR(14)` and `H4 ATR(14)` |
 | `P` | Open **Risk & Position Sizing Modal** (edit Account Balance, Risk %, SL ATR Multiplier) |

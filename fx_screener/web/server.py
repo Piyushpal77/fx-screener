@@ -71,7 +71,7 @@ class ScreenerWebState:
                 self.universe_data, self.config, source=source
             )
             self.tracked_signals = self.tracker.sync_and_evaluate(
-                self.result.pairs, self.universe_data
+                self.result.pairs, self.universe_data, source=source
             )
             self.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.last_refresh_epoch = datetime.now().timestamp()
@@ -90,7 +90,7 @@ class ScreenerWebState:
                 self.universe_data, self.config, source=self.result.source
             )
             self.tracked_signals = self.tracker.sync_and_evaluate(
-                self.result.pairs, self.universe_data
+                self.result.pairs, self.universe_data, source=source
             )
 
 
@@ -115,6 +115,10 @@ def _serialize_timeframe_score(tf_score: Any) -> Dict[str, Any]:
             "hma_status": ind.hma_status,
             "hma_bull_cross": ind.hma_bull_cross,
             "hma_bear_cross": ind.hma_bear_cross,
+            "dx14": round(ind.dx14, 1),
+            "ravi": round(ind.ravi, 2),
+            "vhf14": round(ind.vhf14, 2),
+            "chop14": round(ind.chop14, 1),
             "adx14": round(ind.adx14, 1),
             "plus_di": round(ind.plus_di, 1),
             "minus_di": round(ind.minus_di, 1),
@@ -411,6 +415,10 @@ def create_web_app(
                 "hma21": round(snap.hma21, dec),
                 "hma_status": snap.hma_status,
                 "rsi14": round(snap.rsi14, 1),
+                "dx14": round(snap.dx14, 1),
+                "ravi": round(snap.ravi, 2),
+                "vhf14": round(snap.vhf14, 2),
+                "chop14": round(snap.chop14, 1),
                 "adx14": round(snap.adx14, 1),
                 "atr14": round(snap.atr14, dec),
                 "atr_pips": round(snap.atr14 / spec.pip_size, 1),

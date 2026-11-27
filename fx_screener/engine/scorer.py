@@ -67,7 +67,10 @@ class ScreenerResult:
 
 
 def score_trend_pillar(snap: IndicatorSnapshot) -> float:
-    """Score Trend Pillar (-100 to +100) using Fast/Slow Hull Moving Averages (HMA 9/21), EMA 50/200 stack, DI+/-, and ADX."""
+    """Score Trend Pillar (-100 to +100) using Fast/Slow Hull Moving Averages (HMA 9/21),
+    EMA 20/50/200 stack, DI+/-, and a zero-lag Early Trend Efficiency Conviction Multiplier
+    combining DX(14), RAVI(7, 65), VHF(14), and CHOP(14) (replacing lagging double-smoothed ADX).
+    """
     points = 0.0
     # 1. Hull Moving Average (HMA 9 & HMA 21) low-lag directional structure (up to +/- 35)
     points += 12.0 if snap.close > snap.hma21 else -12.0
@@ -87,16 +90,33 @@ def score_trend_pillar(snap: IndicatorSnapshot) -> float:
     di_spread = snap.plus_di - snap.minus_di
     points += float(np.clip(di_spread * 0.85, -20.0, 20.0))
 
-    # ADX trend strength multiplier:
-    # ADX >= 30 boosts trend conviction by up to 1.25x; ADX < 18 dampens range-bound noise to 0.65x
-    if snap.adx14 >= 30.0:
-        adx_mult = min(1.25, 1.0 + (snap.adx14 - 25.0) * 0.01)
-    elif snap.adx14 < 18.0:
-        adx_mult = max(0.60, 0.60 + (snap.adx14 / 18.0) * 0.35)
-    else:
-        adx_mult = 0.95 + ((snap.adx14 - 18.0) / 12.0) * 0.15
+    # 4. Early Trend Efficiency Conviction Multiplier (replaces double-smoothed ADX(14)):
+    #    - DX(14): unsmoothed Wilder Directional Index (0..100, spikes immediately on breakout)
+    #    - RAVI(7, 65): Chande dual-SMA % divergence (normalized by ATR% to scale across FX/Gold; >0.3% = trending)
+    #    - VHF(14): White Vertical Horizontal Filter (0..1; >=0.38 = linear trend)
+    #    - CHOP(14): Dreiss Choppiness Index (0..100; <38.2 = strong trend, >61.8 = sideways chop)
+    dx_eff = float(np.clip((snap.dx14 - 12.0) / 36.0, 0.0, 1.0))
 
-    return float(np.clip(points * adx_mult, -100.0, 100.0))
+    # Normalize RAVI against ATR% (with floor at Chande's 0.3% threshold) + bonus if RAVI is actively rising
+    ravi_thresh = max(0.30, snap.atr_pct * 0.65)
+    ravi_eff = float(np.clip(snap.ravi / (ravi_thresh * 3.2), 0.0, 1.0))
+    if snap.ravi_rising and snap.ravi >= 0.25:
+        ravi_eff = min(1.0, ravi_eff + 0.15)
+
+    vhf_eff = float(np.clip((snap.vhf14 - 0.22) / 0.33, 0.0, 1.0))
+    # Inverted CHOP: 61.8 -> 0.0 (chop), 38.2 -> 1.0 (strong linear trend)
+    chop_eff = float(np.clip((61.8 - snap.chop14) / (61.8 - 38.2), 0.0, 1.0))
+
+    trend_efficiency = (
+        0.35 * dx_eff
+        + 0.25 * ravi_eff
+        + 0.20 * vhf_eff
+        + 0.20 * chop_eff
+    )
+    # Maps efficiency [0..1] to conviction multiplier [0.65..1.28]
+    conviction_mult = 0.65 + 0.63 * trend_efficiency
+
+    return float(np.clip(points * conviction_mult, -100.0, 100.0))
 
 
 def score_momentum_pillar(snap: IndicatorSnapshot) -> float:

@@ -50,13 +50,26 @@ def load_or_fetch_universe(
     provider = get_provider(config)
     try:
         fresh = provider.fetch_universe(target_pairs)
-        # If partial fetch, fill any missing pairs from synthetic fallback so all 30 render
+        # If partial fetch, prefer stale SQLite cache for missing pairs before synthetic fallback
+        synthetic_pairs: List[str] = []
         if len(fresh) < len(target_pairs):
             missing = [p for p in target_pairs if p not in fresh]
             if missing:
-                synth = SyntheticProvider().fetch_universe(missing)
-                fresh.update(synth)
-        cache.save_universe(fresh, provider_name=provider.name)
+                stale_cached = cache.load_universe(missing)
+                for p, tfs in stale_cached.items():
+                    fresh[p] = tfs
+                still_missing = [p for p in missing if p not in fresh]
+                if still_missing:
+                    synth = SyntheticProvider().fetch_universe(still_missing)
+                    for p, tfs in synth.items():
+                        for df in tfs.values():
+                            df.attrs["is_synthetic"] = True
+                        fresh[p] = tfs
+                        synthetic_pairs.append(p)
+        # Only cache non-synthetic pairs under the live provider name
+        to_cache = {p: tfs for p, tfs in fresh.items() if p not in synthetic_pairs}
+        if to_cache:
+            cache.save_universe(to_cache, provider_name=provider.name)
         return fresh, provider.name
     except Exception as exc:
         logger.warning("Primary provider '%s' failed (%s). Checking cache/fallback.", provider.name, exc)
@@ -66,7 +79,9 @@ def load_or_fetch_universe(
             return cached, f"stale-cache ({prov})"
 
         synth_data = SyntheticProvider().fetch_universe(target_pairs)
-        cache.save_universe(synth_data, provider_name="synthetic-fallback")
+        for tfs in synth_data.values():
+            for df in tfs.values():
+                df.attrs["is_synthetic"] = True
         return synth_data, "synthetic-fallback"
 
 
