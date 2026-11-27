@@ -607,30 +607,45 @@
     /* Chart Header Bar */
     .chart-header {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
+      flex-direction: column;
+      padding: 7px 14px;
       background: var(--bg-panel);
       border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-      gap: 10px;
+      gap: 6px;
+    }
+
+    .chart-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .chart-header-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: nowrap;
     }
 
     .active-pair-info {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      white-space: nowrap;
     }
 
     .active-pair-name {
-      font-size: 19px;
+      font-size: 17px;
       font-weight: 800;
       color: #fff;
       letter-spacing: -0.02em;
     }
 
     .active-pair-price {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--accent);
     }
@@ -638,10 +653,10 @@
     .tf-switcher {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
       background: var(--bg-base);
-      padding: 3px;
-      border-radius: 8px;
+      padding: 2px;
+      border-radius: 7px;
       border: 1px solid var(--border);
     }
 
@@ -650,10 +665,10 @@
       border: none;
       color: var(--text-muted);
       font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 700;
-      padding: 5px 11px;
-      border-radius: 6px;
+      padding: 4px 9px;
+      border-radius: 5px;
       cursor: pointer;
       transition: all 0.15s;
     }
@@ -702,7 +717,7 @@
 
     #main-chart {
       width: 100%;
-      height: 360px;
+      height: 410px;
     }
 
     .chart-legend {
@@ -991,7 +1006,7 @@
     .entry-vline-overlay {
       position: absolute;
       top: 0;
-      height: 360px;
+      height: 410px;
       width: 0;
       border-left: 2px dotted #38bdf8;
       pointer-events: none;
@@ -1126,28 +1141,33 @@
     <!-- Right Pane: Interactive Chart (W1, D1, H4, H1) + Inspector -->
     <div class="right-pane">
       <div class="chart-header">
-        <div class="active-pair-info">
-          <span class="active-pair-name" id="chart-pair-title">EUR/USD</span>
-          <span class="active-pair-price mono" id="chart-pair-price">1.05400</span>
-          <span id="chart-pair-badge"></span>
+        <div class="chart-header-top">
+          <div class="active-pair-info">
+            <span class="active-pair-name" id="chart-pair-title">EUR/USD</span>
+            <span class="active-pair-price mono" id="chart-pair-price">1.05400</span>
+            <span id="chart-pair-badge"></span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="toggle-chip active" id="tog-levels" onclick="toggleOverlay('levels')" title="Show/Hide Entry, Stop Loss & Take Profit Lines">SL/TP Lines</span>
+            <!-- Timeframe Switcher: Weekly to Hourly -->
+            <div class="tf-switcher">
+              <button class="tf-btn" data-tf="W1" onclick="switchChartTimeframe('W1')">W1</button>
+              <button class="tf-btn" data-tf="D1" onclick="switchChartTimeframe('D1')">D1</button>
+              <button class="tf-btn active" data-tf="H4" onclick="switchChartTimeframe('H4')">H4</button>
+              <button class="tf-btn" data-tf="H1" onclick="switchChartTimeframe('H1')">H1</button>
+            </div>
+          </div>
         </div>
 
-        <!-- Timeframe Switcher: Weekly to Hourly -->
-        <div class="tf-switcher">
-          <button class="tf-btn" data-tf="W1" onclick="switchChartTimeframe('W1')">W1 (Weekly)</button>
-          <button class="tf-btn" data-tf="D1" onclick="switchChartTimeframe('D1')">D1 (Daily)</button>
-          <button class="tf-btn active" data-tf="H4" onclick="switchChartTimeframe('H4')">H4 (4-Hour)</button>
-          <button class="tf-btn" data-tf="H1" onclick="switchChartTimeframe('H1')">H1 (Hourly)</button>
-        </div>
-
-        <div class="overlay-toggles" style="flex-wrap:wrap;">
-          <span class="toggle-chip" id="tog-clean" onclick="toggleCleanChartMode()" style="border-color:#fbbf24; color:#fbbf24;" title="Hide all overlays for a clean pure candlestick chart (click again to restore)">🧹 Clean Chart</span>
-          <span class="toggle-chip active" id="tog-hma" onclick="toggleOverlay('hma')" title="Fast HMA(9) Cyan & Slow HMA(21) Rose">Hull HMA 9/21</span>
-          <span class="toggle-chip active" id="tog-dc" onclick="toggleOverlay('dc')" title="Fast Donchian(10) Entry + Donchian(5) Exit + SuperTrend(10, 2.5)">Donchian 10/5 + ST</span>
-          <span class="toggle-chip" id="tog-tpo" onclick="toggleOverlay('tpo')" title="Steidlmayer TPO 70% Value Area (VAH, POC, VAL)">TPO VAH/POC/VAL</span>
-          <span class="toggle-chip" id="tog-ema" onclick="toggleOverlay('ema')">EMA 20/50/200</span>
-          <span class="toggle-chip" id="tog-bb" onclick="toggleOverlay('bb')">Bollinger</span>
-          <span class="toggle-chip active" id="tog-levels" onclick="toggleOverlay('levels')">SL/TP Lines</span>
+        <div class="chart-header-bottom">
+          <div class="overlay-toggles">
+            <span class="toggle-chip" id="tog-clean" onclick="toggleCleanChartMode()" style="border-color:#fbbf24; color:#fbbf24;" title="Hide all overlays for a clean pure candlestick chart (click again to restore)">🧹 Clean Chart</span>
+            <span class="toggle-chip active" id="tog-hma" onclick="toggleOverlay('hma')" title="Fast HMA(9) Cyan & Slow HMA(21) Rose">Hull HMA 9/21</span>
+            <span class="toggle-chip active" id="tog-dc" onclick="toggleOverlay('dc')" title="Fast Donchian(10) Entry + Donchian(5) Exit + SuperTrend(10, 2.5)">Donchian 10/5 + ST</span>
+            <span class="toggle-chip" id="tog-ema" onclick="toggleOverlay('ema')">EMA 20/50/200</span>
+            <span class="toggle-chip" id="tog-bb" onclick="toggleOverlay('bb')">Bollinger</span>
+          </div>
         </div>
       </div>
 
@@ -1261,8 +1281,9 @@
             const selMeta = screenerData.pairs.find(p => p.pair === selectedPair);
             if (selMeta) {
               document.getElementById("chart-pair-price").textContent = selMeta.price.toFixed(selMeta.decimals);
-              // Stream the live spot tick into the current candle on the chart in-place without resetting zoom
+              // Stream the live spot tick into the current candle on the chart in-place without shifting the viewport!
               if (lastChartPayload && lastChartPayload.candles && lastChartPayload.candles.length > 0 && candleSeries) {
+                const lockedRange = mainChart.timeScale().getVisibleLogicalRange();
                 const lastBar = lastChartPayload.candles[lastChartPayload.candles.length - 1];
                 const updatedBar = {
                   time: lastBar.time,
@@ -1273,6 +1294,10 @@
                 };
                 lastChartPayload.candles[lastChartPayload.candles.length - 1] = updatedBar;
                 try { candleSeries.update(updatedBar); } catch (e) {}
+                if (lockedRange) {
+                  mainChart.timeScale().setVisibleLogicalRange(lockedRange);
+                  subChart.timeScale().setVisibleLogicalRange(lockedRange);
+                }
               }
             }
           }
@@ -1350,7 +1375,25 @@
           horzLines: { visible: false },
         },
         crosshair: {
-          mode: LightweightCharts.CrosshairMode.Normal,
+          mode: LightweightCharts.CrosshairMode.Magnet,
+        },
+        kineticScroll: {
+          mouse: true,
+          touch: true,
+        },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true,
+        },
+        handleScale: {
+          axisPressedMouseMove: {
+            time: true,
+            price: true,
+          },
+          mouseWheel: true,
+          pinch: true,
         },
         rightPriceScale: {
           borderColor: '#1e293b',
@@ -1361,6 +1404,8 @@
           borderColor: '#1e293b',
           timeVisible: true,
           secondsVisible: false,
+          rightOffset: 10,
+          shiftVisibleRangeOnNewBar: false,
         },
       });
 
@@ -1412,6 +1457,8 @@
         timeScale: {
           borderColor: '#1e293b',
           visible: false,
+          rightOffset: 10,
+          shiftVisibleRangeOnNewBar: false,
         },
       });
 
@@ -1421,10 +1468,12 @@
       macdSigSeries = subChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, visible: false });
       ewoSeries = subChart.addHistogramSeries({ priceLineVisible: false, visible: true });
 
-      // Bidirectional visible logical range & crosshair synchronization between main chart and subchart
+      // Smooth 60fps visible logical range & crosshair synchronization between main chart and subchart
       let isSyncingRange = false;
+      let vlineRafId = null;
       mainChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        updateEntryVerticalLinePosition();
+        if (vlineRafId) cancelAnimationFrame(vlineRafId);
+        vlineRafId = requestAnimationFrame(updateEntryVerticalLinePosition);
         if (isSyncingRange || !range) return;
         isSyncingRange = true;
         subChart.timeScale().setVisibleLogicalRange(range);
@@ -1444,24 +1493,19 @@
       });
 
       mainChart.subscribeCrosshairMove((param) => {
-        if (!param || !param.time) {
+        if (!param || !param.time || !param.point) {
           subChart.clearCrosshairPosition();
           return;
         }
         const targetSeries = activeSubchart === "rsi" ? rsiSeries : (activeSubchart === "ewo" ? ewoSeries : macdLineSeries);
-        subChart.setCrosshairPosition(0, param.time, targetSeries);
+        try { subChart.setCrosshairPosition(0, param.time, targetSeries); } catch (e) {}
       });
       subChart.subscribeCrosshairMove((param) => {
-        if (!param || !param.time) {
+        if (!param || !param.time || !param.point) {
           mainChart.clearCrosshairPosition();
           return;
         }
-        mainChart.setCrosshairPosition(0, param.time, candleSeries);
-      });
-
-      window.addEventListener("resize", () => {
-        mainChart.applyOptions({ width: mainEl.clientWidth });
-        subChart.applyOptions({ width: subEl.clientWidth });
+        try { mainChart.setCrosshairPosition(0, param.time, candleSeries); } catch (e) {}
       });
     }
 
@@ -1861,15 +1905,11 @@
 
         updateSubchartHeaderTitle(data);
 
-        drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
-        drawTpoLevelLines(data.tpo_levels);
-        drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
-
+        // Do NOT wipe & recreate series/markers during live tick updates — keep the chart completely still!
         if (savedLogicalRange) {
           mainChart.timeScale().setVisibleLogicalRange(savedLogicalRange);
           subChart.timeScale().setVisibleLogicalRange(savedLogicalRange);
         }
-        setTimeout(updateEntryVerticalLinePosition, 20);
 
         if (pairMeta) {
           renderInspectorPanels(pairMeta, data);
@@ -1896,16 +1936,23 @@
       applyAllChartOverlays(data, pairMeta);
       renderSubchartData(data);
 
-      // Reset both X (time) and Y (price) scales and lock subchart to exact mainChart logical range
+      // Reset both X (time) and Y (price) scales with breathing room on the right hand axis
       mainChart.priceScale('right').applyOptions({
         autoScale: true,
         mode: LightweightCharts.PriceScaleMode.Logarithmic,
       });
       subChart.priceScale('right').applyOptions({ autoScale: true });
-      mainChart.timeScale().fitContent();
-      const mainRange = mainChart.timeScale().getVisibleLogicalRange();
-      if (mainRange) {
-        subChart.timeScale().setVisibleLogicalRange(mainRange);
+      const totalBars = (data.candles || []).length;
+      if (totalBars > 10) {
+        const visibleBars = Math.min(totalBars, 115);
+        const initialRange = {
+          from: Math.max(0, totalBars - visibleBars),
+          to: (totalBars - 1) + 10, // 10-bar empty buffer on the right before the Y-axis
+        };
+        mainChart.timeScale().setVisibleLogicalRange(initialRange);
+        subChart.timeScale().setVisibleLogicalRange(initialRange);
+      } else {
+        mainChart.timeScale().fitContent();
       }
       setTimeout(updateEntryVerticalLinePosition, 30);
 
@@ -2334,7 +2381,8 @@
       document.getElementById("tog-clean").classList.toggle("active", cleanChartMode);
       document.getElementById("tog-hma").classList.toggle("active", showHMA && !cleanChartMode);
       document.getElementById("tog-dc").classList.toggle("active", showDonchianST && !cleanChartMode);
-      document.getElementById("tog-tpo").classList.toggle("active", showTPO && !cleanChartMode);
+      const tpoEl = document.getElementById("tog-tpo");
+      if (tpoEl) tpoEl.classList.toggle("active", showTPO && !cleanChartMode);
       document.getElementById("tog-ema").classList.toggle("active", showEMA && !cleanChartMode);
       document.getElementById("tog-bb").classList.toggle("active", showBB && !cleanChartMode);
       document.getElementById("tog-levels").classList.toggle("active", showTradeLevels && !cleanChartMode);

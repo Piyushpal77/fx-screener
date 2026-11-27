@@ -87,12 +87,16 @@ def test_v2_web_app_and_asap_exit_engine(tmp_path: Path) -> None:
     assert state.result is not None
     assert len(state.result.pairs) == 31
 
+    iso_tracker = SignalTrackerV2(
+        db_path=tmp_path / "v2_iso.sqlite3",
+        csv_path=tmp_path / "v2_iso.csv",
+    )
     long_pair = next(p for p in state.result.pairs if p.composite_score >= 25.0)
     long_pair.signal = "STRONG BUY"
     long_pair.is_fresh_hma_entry = True
     long_pair.hma_trigger = "⚡ H4 DONCHIAN(10) BULL BRK"
 
-    signals = tracker.sync_and_evaluate([long_pair], state.universe_data, source="synthetic", allow_synthetic=True)
+    signals = iso_tracker.sync_and_evaluate([long_pair], state.universe_data, source="synthetic", allow_synthetic=True)
     assert len(signals) == 1
     sig = signals[0]
 
@@ -103,6 +107,6 @@ def test_v2_web_app_and_asap_exit_engine(tmp_path: Path) -> None:
     long_pair.h4.indicators.hma9 = sig.entry_price - 0.0005
     long_pair.h4.indicators.hma9_prev = sig.entry_price + 0.0005
 
-    updated = tracker.sync_and_evaluate([long_pair], state.universe_data, source="synthetic", allow_synthetic=True)
+    updated = iso_tracker.sync_and_evaluate([long_pair], state.universe_data, source="synthetic", allow_synthetic=True)
     assert updated[0].asap_exit_alert is True
     assert "EXIT NOW" in updated[0].asap_exit_reason
