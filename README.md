@@ -29,22 +29,28 @@ Built with **Textual** (interactive TUI dashboard) and **Rich** (one-shot CLI & 
 
 ---
 
-## Quick Start
+## Quick Start — Side-by-Side V1 & V2 Launchers
 
-### 1. Launch the Interactive Web UI (Default)
-Double-click `run_screener.bat` in Windows Explorer or run:
+Both versions live side-by-side in this workspace with independent packages, configs, caches, and ports so you can even run both simultaneously to compare signals live:
+
+### 1. Launch **FX Screener 2.0** (`fx_screener2` — Port `8060`)
+Double-click `run_screener2.bat` (or `FX Screener2\run_screener2.bat`) in Windows Explorer, or run:
+```powershell
+.\run_screener2.bat
+```
+- **Module**: `fx_screener2` | **Config**: `config_screener2.yaml` | **Default URL**: `http://127.0.0.1:8060`
+- Includes **45/30/15/10** Early Trend & Momentum Acceleration weights, **Fast `Donchian(10/5)` + `SuperTrend`**, **`EWO(5,35)` & `MACD Δ²H`**, **`TPO VAH/POC/VAL`**, **4-Trigger ASAP Exit Engine (`⚠ EXIT NOW`)**, and **`🧹 Clean Chart` Mode**.
+
+### 2. Launch **FX Screener 1.0 (Original `main`)** (`fx_screener` — Port `8050`)
+Double-click `run_screener.bat` in Windows Explorer, or run:
 ```powershell
 .\run_screener.bat
 ```
-This starts the FastAPI + TradingView Lightweight Charts UI at `http://127.0.0.1:8050` and opens it in your browser.
-- **Click any FX pair or metal** in the screener table (or top divergence chips) to load its interactive candlestick chart.
-- **Switch timeframes** from **W1 (Weekly)** → **D1 (Daily)** → **H4 (4-Hour)** → **H1 (Hourly)**.
-- **Toggle overlays**: `EMA 20/50/200`, `Bollinger Bands (20, 2)`, `Entry / Stop-Loss / TP1 / TP2` price lines, and switch the subchart between `RSI (14)` and `MACD (12, 26, 9)`.
-- **Click any G8 Currency card** (`USD`, `EUR`, `GBP`, `JPY`, etc.) to filter all pairs containing that currency.
+- **Module**: `fx_screener` | **Config**: `config.yaml` | **Default URL**: `http://127.0.0.1:8050`
 
-### 2. Launch the Terminal UI (`Textual`) in PowerShell
+### 3. Terminal UI (`Textual`) Mode
 ```powershell
-.\run_screener.bat --tui
+.\run_screener2.bat --tui
 ```
 
 ### 2. Keyboard Shortcuts in the Terminal UI

@@ -898,53 +898,6 @@
       animation: flashRedPulse 1.35s ease-in-out infinite;
     }
 
-    @keyframes flashAmberExit {
-      0%, 100% {
-        background-color: rgba(245, 158, 11, 0.10);
-        box-shadow: inset 4px 0 0 #f59e0b;
-      }
-      50% {
-        background-color: rgba(245, 158, 11, 0.36);
-        box-shadow: inset 5px 0 0 #fbbf24, 0 0 14px rgba(245, 158, 11, 0.55);
-      }
-    }
-
-    .flash-asap-exit {
-      animation: flashAmberExit 1.2s ease-in-out infinite;
-    }
-
-    .sig-early-buy {
-      background: rgba(34, 211, 238, 0.22);
-      color: #67e8f9;
-      border: 1px solid rgba(34, 211, 238, 0.55);
-    }
-
-    .sig-early-sell {
-      background: rgba(244, 63, 94, 0.24);
-      color: #fda4af;
-      border: 1px solid rgba(244, 63, 94, 0.55);
-    }
-
-    .top-pick-tag {
-      font-size: 9.5px;
-      font-weight: 800;
-      padding: 1px 5px;
-      border-radius: 3px;
-      background: rgba(56, 189, 248, 0.20);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.40);
-    }
-
-    .exit-warn-tag {
-      font-size: 9.5px;
-      font-weight: 800;
-      padding: 1px 5px;
-      border-radius: 3px;
-      background: rgba(245, 158, 11, 0.24);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.55);
-    }
-
     /* Live Price Tick Flash Animations (Green Uptick / Red Downtick) */
     @keyframes livePriceUpFlash {
       0% {
@@ -1063,12 +1016,9 @@
       <div class="filter-toolbar">
         <div class="filter-pills">
           <button class="pill active" data-filter="all" onclick="setFilterMode('all')">All (31)</button>
-          <button class="pill" data-filter="top5" onclick="setFilterMode('top5')">★ Top 5 L/S</button>
-          <button class="pill" data-filter="early" onclick="setFilterMode('early')">⚡ Early Entries</button>
-          <button class="pill" data-filter="exit_alerts" onclick="setFilterMode('exit_alerts')" style="border-color:rgba(245,158,11,0.5); color:#fbbf24;">⚠ Exit Alerts</button>
           <button class="pill" data-filter="strong" onclick="setFilterMode('strong')">★ Strong Signals</button>
           <button class="pill" data-filter="confluence" onclick="setFilterMode('confluence')">MTF Confluence</button>
-          <button class="pill" data-filter="squeeze" onclick="setFilterMode('squeeze')">TTM Squeeze</button>
+          <button class="pill" data-filter="squeeze" onclick="setFilterMode('squeeze')">Squeeze / Breakout</button>
           <button class="pill" data-filter="watchlist" onclick="setFilterMode('watchlist')">★ Watchlist</button>
           <button class="pill" data-filter="tracker" id="pill-tracker" onclick="switchLeftTab('tracker')" style="border-color:rgba(16,185,129,0.5); color:#34d399;">📊 Performance Log (0)</button>
         </div>
@@ -1140,13 +1090,10 @@
           <button class="tf-btn" data-tf="H1" onclick="switchChartTimeframe('H1')">H1 (Hourly)</button>
         </div>
 
-        <div class="overlay-toggles" style="flex-wrap:wrap;">
-          <span class="toggle-chip" id="tog-clean" onclick="toggleCleanChartMode()" style="border-color:#fbbf24; color:#fbbf24;" title="Hide all overlays for a clean pure candlestick chart (click again to restore)">🧹 Clean Chart</span>
-          <span class="toggle-chip active" id="tog-hma" onclick="toggleOverlay('hma')" title="Fast HMA(9) Cyan & Slow HMA(21) Rose">Hull HMA 9/21</span>
-          <span class="toggle-chip active" id="tog-dc" onclick="toggleOverlay('dc')" title="Fast Donchian(10) Entry + Donchian(5) Exit + SuperTrend(10, 2.5)">Donchian 10/5 + ST</span>
-          <span class="toggle-chip" id="tog-tpo" onclick="toggleOverlay('tpo')" title="Steidlmayer TPO 70% Value Area (VAH, POC, VAL)">TPO VAH/POC/VAL</span>
-          <span class="toggle-chip" id="tog-ema" onclick="toggleOverlay('ema')">EMA 20/50/200</span>
-          <span class="toggle-chip" id="tog-bb" onclick="toggleOverlay('bb')">Bollinger</span>
+        <div class="overlay-toggles">
+          <span class="toggle-chip active" id="tog-hma" onclick="toggleOverlay('hma')" title="Fast HMA(9) Cyan & Slow HMA(21) Amber">Hull HMA 9/21</span>
+          <span class="toggle-chip active" id="tog-ema" onclick="toggleOverlay('ema')">EMA 20/50/200</span>
+          <span class="toggle-chip active" id="tog-bb" onclick="toggleOverlay('bb')">Bollinger</span>
           <span class="toggle-chip active" id="tog-levels" onclick="toggleOverlay('levels')">SL/TP Lines</span>
         </div>
       </div>
@@ -1157,9 +1104,8 @@
         <div class="subchart-header">
           <span class="mono" id="subchart-title">RSI (14) Oscillator & Momentum</span>
           <div style="display:flex; gap:6px;">
-            <span class="toggle-chip active" id="tog-sub-ewo" onclick="switchSubchart('ewo')" title="ATR-Normalized Elliott Wave Oscillator (5, 35)">EWO (5,35)</span>
-            <span class="toggle-chip" id="tog-sub-macd" onclick="switchSubchart('macd')" title="MACD (12,26,9) + 2nd-Derivative Acceleration">MACD + Δ²H</span>
-            <span class="toggle-chip" id="tog-sub-rsi" onclick="switchSubchart('rsi')">RSI (14)</span>
+            <span class="toggle-chip active" id="tog-sub-rsi" onclick="switchSubchart('rsi')">RSI (14)</span>
+            <span class="toggle-chip" id="tog-sub-macd" onclick="switchSubchart('macd')">MACD (12,26,9)</span>
           </div>
         </div>
         <div id="sub-chart"></div>
@@ -1209,15 +1155,11 @@
     let currentEntryIsLong = true;
 
     // Chart Overlays State
-    let cleanChartMode = false;
-    let savedOverlayState = null;
     let showHMA = true;
-    let showDonchianST = true;
-    let showTPO = false;
-    let showEMA = false;
-    let showBB = false;
+    let showEMA = true;
+    let showBB = true;
     let showTradeLevels = true;
-    let activeSubchart = "ewo";
+    let activeSubchart = "rsi";
     let lastChartPayload = null;
     let autoRefreshSeconds = 60;
     let countdownRemaining = 60;
@@ -1317,22 +1259,16 @@
     let ema200Series = null;
     let bbUpperSeries = null;
     let bbLowerSeries = null;
-    let dc10UpperSeries = null;
-    let dc10LowerSeries = null;
-    let dc5LowerOrUpperSeries = null;
-    let supertrendSeries = null;
     let recEntryRaySeries = null;
     let recTpRaySeries = null;
     let recSlRaySeries = null;
     let activePriceLines = [];
-    let activeTpoLines = [];
 
     let subChart = null;
     let rsiSeries = null;
     let macdHistSeries = null;
     let macdLineSeries = null;
     let macdSigSeries = null;
-    let ewoSeries = null;
 
     function initCharts() {
       const mainEl = document.getElementById("main-chart");
@@ -1383,12 +1319,6 @@
       bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(148, 163, 184, 0.45)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
-      // Fast Donchian(10) Entry Channel + SuperTrend(10, 2.5)
-      dc10UpperSeries = mainChart.addLineSeries({ color: 'rgba(16, 185, 129, 0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-      dc10LowerSeries = mainChart.addLineSeries({ color: 'rgba(239, 68, 68, 0.55)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-      dc5LowerOrUpperSeries = mainChart.addLineSeries({ color: 'rgba(251, 191, 36, 0.65)', lineWidth: 1, lineStyle: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-      supertrendSeries = mainChart.addLineSeries({ color: '#10b981', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-
       // Forward-extending recommendation rays (from entry date forward until SL or TP is reached)
       recEntryRaySeries = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 2, lineStyle: 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       recTpRaySeries = mainChart.addLineSeries({ color: '#10b981', lineWidth: 2, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
@@ -1415,11 +1345,10 @@
         },
       });
 
-      rsiSeries = subChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, visible: false });
+      rsiSeries = subChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false });
       macdHistSeries = subChart.addHistogramSeries({ priceLineVisible: false, visible: false });
       macdLineSeries = subChart.addLineSeries({ color: '#38bdf8', lineWidth: 1.5, priceLineVisible: false, visible: false });
       macdSigSeries = subChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, priceLineVisible: false, visible: false });
-      ewoSeries = subChart.addHistogramSeries({ priceLineVisible: false, visible: true });
 
       // Bidirectional visible logical range & crosshair synchronization between main chart and subchart
       let isSyncingRange = false;
@@ -1448,7 +1377,7 @@
           subChart.clearCrosshairPosition();
           return;
         }
-        const targetSeries = activeSubchart === "rsi" ? rsiSeries : (activeSubchart === "ewo" ? ewoSeries : macdLineSeries);
+        const targetSeries = activeSubchart === "rsi" ? rsiSeries : macdLineSeries;
         subChart.setCrosshairPosition(0, param.time, targetSeries);
       });
       subChart.subscribeCrosshairMove((param) => {
@@ -1530,21 +1459,10 @@
       if (!screenerData) return [];
       let list = [...screenerData.pairs];
 
-      if (filterMode === "top5") {
-        list = list.filter(p => p.top_pick_rank !== 0);
-      } else if (filterMode === "early") {
-        list = list.filter(p => p.is_early_entry || p.signal.includes("EARLY"));
-      } else if (filterMode === "exit_alerts") {
-        const activeTrackedExits = new Set(
-          ((screenerData.tracker && screenerData.tracker.signals) || [])
-            .filter(s => s.asap_exit_alert && (s.status === "ACTIVE" || s.status === "TP1_HIT"))
-            .map(s => s.pair)
-        );
-        list = list.filter(p => p.asap_exit_flag || activeTrackedExits.has(p.pair));
-      } else if (filterMode === "confluence") {
+      if (filterMode === "confluence") {
         list = list.filter(p => p.confluence);
       } else if (filterMode === "strong") {
-        list = list.filter(p => p.signal === "STRONG BUY" || p.signal === "STRONG SELL" || p.signal.includes("EARLY"));
+        list = list.filter(p => p.signal === "STRONG BUY" || p.signal === "STRONG SELL");
       } else if (filterMode === "squeeze") {
         list = list.filter(p => p.vol_regime.includes("SQUEEZE") || p.vol_regime.includes("BREAKOUT"));
       } else if (filterMode === "watchlist") {
@@ -1587,11 +1505,9 @@
 
     function getSignalClass(signal) {
       if (signal === "STRONG BUY") return "sig-strong-buy";
-      if (signal === "★ EARLY BUY") return "sig-early-buy";
       if (signal === "BUY (PULLBACK)") return "sig-buy-pullback";
       if (signal === "BUY") return "sig-buy";
       if (signal === "STRONG SELL") return "sig-strong-sell";
-      if (signal === "★ EARLY SELL") return "sig-early-sell";
       if (signal === "SELL (PULLBACK)") return "sig-sell-pullback";
       if (signal === "SELL") return "sig-sell";
       return "sig-neutral";
@@ -1609,8 +1525,11 @@
 
     function isPairFlashingNewEntry(p) {
       if (!p) return false;
-      if (p.signal !== "STRONG BUY" && p.signal !== "STRONG SELL" && !p.signal.includes("EARLY")) return false;
+      // 1. Must currently be a STRONG BUY or STRONG SELL
+      if (p.signal !== "STRONG BUY" && p.signal !== "STRONG SELL") return false;
+      // 2. Must be a fresh H4 Hull Pullback Resumption Turn on the current 4H candle
       if (!p.is_fresh_hma_entry) return false;
+      // 3. Stop flashing once the user clicks the row to inspect it
       if (acknowledgedPairs.has(p.pair)) return false;
       return true;
     }
@@ -1638,10 +1557,9 @@
       tbody.innerHTML = rows.map(p => {
         const isSel = p.pair === selectedPair ? "selected" : "";
         const shouldFlash = isPairFlashingNewEntry(p);
-        const isExitWarn = p.asap_exit_flag && !acknowledgedPairs.has(p.pair + ":exit");
-        const flashClass = isExitWarn
-          ? "flash-asap-exit"
-          : (shouldFlash ? ((p.signal === "STRONG BUY" || p.signal === "★ EARLY BUY") ? "flash-new-long" : "flash-new-short") : "");
+        const flashClass = shouldFlash
+          ? (p.signal === "STRONG BUY" ? "flash-new-long" : "flash-new-short")
+          : "";
         const starClass = p.is_watchlist ? "starred" : "";
         const chgClass = p.change_d1_pct >= 0 ? "bull-text" : "bear-text";
         const confClass = p.confluence_label.includes("BULL") ? "conf-bull" : (p.confluence_label.includes("BEAR") ? "conf-bear" : "conf-mixed");
@@ -1649,8 +1567,6 @@
         const tickDir = liveTickDirections[p.pair];
         const tickClass = tickDir === "up" ? "live-tick-up" : (tickDir === "down" ? "live-tick-down" : "");
         const tickArrow = tickDir === "up" ? `<span class="bull-text" style="font-size:10px;">▲</span> ` : (tickDir === "down" ? `<span class="bear-text" style="font-size:10px;">▼</span> ` : "");
-        const topPickBadge = p.top_pick_label ? `<span class="top-pick-tag">${p.top_pick_label.replace("★ ", "")}</span>` : "";
-        const exitBadge = p.asap_exit_flag ? `<span class="exit-warn-tag" title="${p.asap_exit_reason}">⚠ EXIT</span>` : "";
 
         return `
           <tr class="${isSel} ${flashClass}" onclick="selectPair('${p.pair}')">
@@ -1661,8 +1577,6 @@
               <div class="pair-cell">
                 <span class="pair-symbol">${p.pair}</span>
                 <span class="cat-tag ${p.category}">${p.category}</span>
-                ${topPickBadge}
-                ${exitBadge}
               </div>
             </td>
             <td class="mono ${tickClass}" style="text-align:right; font-weight:600;">${tickArrow}${p.price.toFixed(p.decimals)}</td>
@@ -1712,21 +1626,17 @@
         const dec = pairMeta ? pairMeta.decimals : 5;
         const isSel = (s.pair === selectedPair && s.id === selectedTrackedSignalId) ? "selected" : "";
         const isFreshBar = (s.status === "ACTIVE") && (s.bars_elapsed_h4 === 0) && isPairFlashingNewEntry(pairMeta);
-        const flashClass = (s.asap_exit_alert && (s.status === "ACTIVE" || s.status === "TP1_HIT"))
-          ? "flash-asap-exit"
-          : (isFreshBar ? (s.direction === "LONG" ? "flash-new-long" : "flash-new-short") : "");
+        const flashClass = isFreshBar ? (s.direction === "LONG" ? "flash-new-long" : "flash-new-short") : "";
 
         let outcomeBadge = "";
         if (s.status === "WIN_TP2") {
           outcomeBadge = `<span class="signal-badge sig-strong-buy">★ Take Profit Achieved (WIN)</span>`;
         } else if (s.status === "LOSS_SL") {
           outcomeBadge = `<span class="signal-badge sig-strong-sell">✖ Stop Loss Reached (LOSS)</span>`;
-        } else if (s.asap_exit_alert && s.asap_exit_reason) {
-          outcomeBadge = `<span class="exit-warn-tag" style="font-size:11px; padding:3px 8px;">${s.asap_exit_reason}</span>`;
         } else if (s.status === "TP1_HIT") {
-          outcomeBadge = `<span class="signal-badge sig-buy">✓ TP1 Reached (Trail: ${s.trailing_stop_price ? s.trailing_stop_price.toFixed(dec) : '-'})</span>`;
+          outcomeBadge = `<span class="signal-badge sig-buy">✓ TP1 Reached (Tracking to Target)</span>`;
         } else {
-          outcomeBadge = `<span class="hma-badge hma-pullback">● Active (DC5 Trail: ${s.trailing_stop_price ? s.trailing_stop_price.toFixed(dec) : '-'})</span>`;
+          outcomeBadge = `<span class="hma-badge hma-pullback">● In Progress (Tracking 4H)</span>`;
         }
 
         const liveSpot = pairMeta ? pairMeta.price : s.current_h4_price;
@@ -1793,7 +1703,6 @@
       selectedPair = pair;
       selectedTrackedSignalId = null;
       acknowledgedPairs.add(pair);
-      acknowledgedPairs.add(pair + ":exit");
       renderScreenerTable();
       renderTrackerTable();
       await loadPairChart(selectedPair, selectedTimeframe);
@@ -1840,29 +1749,26 @@
         };
 
         streamTail(candleSeries, data.candles, true);
-        streamTail(hma9Series, data.hma9, showHMA && !cleanChartMode);
-        streamTail(hma21Series, data.hma21, showHMA && !cleanChartMode);
-        streamTail(dc10UpperSeries, data.dc10_upper, showDonchianST && !cleanChartMode);
-        streamTail(dc10LowerSeries, data.dc10_lower, showDonchianST && !cleanChartMode);
-        const dc5TrailPts = (pairMeta && pairMeta.composite_score >= 0) ? data.dc5_lower : data.dc5_upper;
-        streamTail(dc5LowerOrUpperSeries, dc5TrailPts, showDonchianST && !cleanChartMode);
-        streamTail(supertrendSeries, data.supertrend, showDonchianST && !cleanChartMode);
-        streamTail(ema20Series, data.ema20, showEMA && !cleanChartMode);
-        streamTail(ema50Series, data.ema50, showEMA && !cleanChartMode);
-        streamTail(ema200Series, data.ema200, showEMA && !cleanChartMode);
-        streamTail(bbUpperSeries, data.bb_upper, showBB && !cleanChartMode);
-        streamTail(bbLowerSeries, data.bb_lower, showBB && !cleanChartMode);
+        streamTail(hma9Series, data.hma9, showHMA);
+        streamTail(hma21Series, data.hma21, showHMA);
+        streamTail(ema20Series, data.ema20, showEMA);
+        streamTail(ema50Series, data.ema50, showEMA);
+        streamTail(ema200Series, data.ema200, showEMA);
+        streamTail(bbUpperSeries, data.bb_upper, showBB);
+        streamTail(bbLowerSeries, data.bb_lower, showBB);
 
         streamTail(rsiSeries, data.rsi14, true);
         streamTail(macdHistSeries, data.macd_hist, true);
         streamTail(macdLineSeries, data.macd_line, true);
         streamTail(macdSigSeries, data.macd_signal, true);
-        streamTail(ewoSeries, data.ewo, true);
 
-        updateSubchartHeaderTitle(data);
+        if (activeSubchart === "rsi") {
+          document.getElementById("subchart-title").textContent = `RSI (14) — Current: ${data.tf_summary.rsi14}`;
+        } else {
+          document.getElementById("subchart-title").textContent = `MACD (12, 26, 9) Histogram & Signal`;
+        }
 
         drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
-        drawTpoLevelLines(data.tpo_levels);
         drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
 
         if (savedLogicalRange) {
@@ -1882,18 +1788,25 @@
         try { candleSeries.removePriceLine(line); } catch (e) {}
       });
       activePriceLines = [];
-      activeTpoLines.forEach(line => {
-        try { candleSeries.removePriceLine(line); } catch (e) {}
-      });
-      activeTpoLines = [];
 
       const pFmt = { type: 'price', precision: dec, minMove: Math.pow(10, -dec) };
-      [candleSeries, hma9Series, hma21Series, dc10UpperSeries, dc10LowerSeries, dc5LowerOrUpperSeries, supertrendSeries, ema20Series, ema50Series, ema200Series, bbUpperSeries, bbLowerSeries, recEntryRaySeries, recTpRaySeries, recSlRaySeries].forEach(s => {
+      [candleSeries, hma9Series, hma21Series, ema20Series, ema50Series, ema200Series, bbUpperSeries, bbLowerSeries, recEntryRaySeries, recTpRaySeries, recSlRaySeries].forEach(s => {
         if (s) s.applyOptions({ priceFormat: pFmt });
       });
       candleSeries.setData(data.candles || []);
 
-      applyAllChartOverlays(data, pairMeta);
+      hma9Series.setData(showHMA ? (data.hma9 || []) : []);
+      hma21Series.setData(showHMA ? (data.hma21 || []) : []);
+
+      ema20Series.setData(showEMA ? (data.ema20 || []) : []);
+      ema50Series.setData(showEMA ? (data.ema50 || []) : []);
+      ema200Series.setData(showEMA ? (data.ema200 || []) : []);
+
+      bbUpperSeries.setData(showBB ? (data.bb_upper || []) : []);
+      bbLowerSeries.setData(showBB ? (data.bb_lower || []) : []);
+
+      drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
+      drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
       renderSubchartData(data);
 
       // Reset both X (time) and Y (price) scales and lock subchart to exact mainChart logical range
@@ -1945,7 +1858,7 @@
       if (recSlRaySeries) recSlRaySeries.setData([]);
       currentEntryAnchorTime = null;
 
-      if (!showTradeLevels || cleanChartMode) {
+      if (!showTradeLevels) {
         updateEntryVerticalLinePosition();
         return;
       }
@@ -2047,60 +1960,9 @@
       return bestTime;
     }
 
-    function drawTpoLevelLines(tpoLevels) {
-      activeTpoLines.forEach(line => {
-        try { candleSeries.removePriceLine(line); } catch (e) {}
-      });
-      activeTpoLines = [];
-      if (!showTPO || cleanChartMode || !tpoLevels || !tpoLevels.poc) return;
-
-      const tpoCfg = [
-        { price: tpoLevels.vah, color: 'rgba(168, 85, 247, 0.85)', title: 'TPO VAH (70%)', lineStyle: 2 },
-        { price: tpoLevels.poc, color: '#e879f9', title: 'TPO POC', lineStyle: 0 },
-        { price: tpoLevels.val, color: 'rgba(168, 85, 247, 0.85)', title: 'TPO VAL (70%)', lineStyle: 2 },
-      ];
-      tpoCfg.forEach(cfg => {
-        const pl = candleSeries.createPriceLine({
-          price: cfg.price,
-          color: cfg.color,
-          lineWidth: 1,
-          lineStyle: cfg.lineStyle,
-          axisLabelVisible: true,
-          title: cfg.title,
-        });
-        activeTpoLines.push(pl);
-      });
-    }
-
-    function applyAllChartOverlays(data, pairMeta) {
-      if (!data) return;
-      const pm = pairMeta || (screenerData && screenerData.pairs ? screenerData.pairs.find(p => p.pair === data.pair) : null);
-      const isLongBias = !pm || pm.composite_score >= 0;
-      const dc5TrailPts = isLongBias ? (data.dc5_lower || []) : (data.dc5_upper || []);
-
-      hma9Series.setData((showHMA && !cleanChartMode) ? (data.hma9 || []) : []);
-      hma21Series.setData((showHMA && !cleanChartMode) ? (data.hma21 || []) : []);
-
-      dc10UpperSeries.setData((showDonchianST && !cleanChartMode) ? (data.dc10_upper || []) : []);
-      dc10LowerSeries.setData((showDonchianST && !cleanChartMode) ? (data.dc10_lower || []) : []);
-      dc5LowerOrUpperSeries.setData((showDonchianST && !cleanChartMode) ? dc5TrailPts : []);
-      supertrendSeries.setData((showDonchianST && !cleanChartMode) ? (data.supertrend || []) : []);
-
-      ema20Series.setData((showEMA && !cleanChartMode) ? (data.ema20 || []) : []);
-      ema50Series.setData((showEMA && !cleanChartMode) ? (data.ema50 || []) : []);
-      ema200Series.setData((showEMA && !cleanChartMode) ? (data.ema200 || []) : []);
-
-      bbUpperSeries.setData((showBB && !cleanChartMode) ? (data.bb_upper || []) : []);
-      bbLowerSeries.setData((showBB && !cleanChartMode) ? (data.bb_lower || []) : []);
-
-      drawTradeLevelLines(data.trade_plan, data.tracked_signals, data.candles || [], data.decimals);
-      drawTpoLevelLines(data.tpo_levels);
-      drawTrackedSignalMarkers(data.candles || [], data.tracked_signals || [], data.decimals);
-    }
-
     function drawTrackedSignalMarkers(candles, trackedSignals, dec) {
       if (!candleSeries) return;
-      if (!showTradeLevels || cleanChartMode || !trackedSignals || trackedSignals.length === 0 || !candles || candles.length === 0) {
+      if (!showTradeLevels || !trackedSignals || trackedSignals.length === 0 || !candles || candles.length === 0) {
         candleSeries.setMarkers([]);
         return;
       }
@@ -2135,43 +1997,21 @@
       candleSeries.setMarkers(markers);
     }
 
-    function updateSubchartHeaderTitle(data) {
-      if (!data || !data.tf_summary) return;
-      if (activeSubchart === "ewo") {
-        document.getElementById("subchart-title").textContent =
-          `Elliott Wave Oscillator EWO (5, 35) — Current: ${data.tf_summary.ewo >= 0 ? '+' : ''}${data.tf_summary.ewo}`;
-      } else if (activeSubchart === "rsi") {
-        document.getElementById("subchart-title").textContent = `RSI (14) — Current: ${data.tf_summary.rsi14}`;
-      } else {
-        const d2Sign = data.tf_summary.macd_accel_d2 >= 0 ? "Accelerating ▲" : "Decelerating ▼";
-        document.getElementById("subchart-title").textContent = `MACD (12, 26, 9) + 2nd-Deriv Δ²H (${d2Sign})`;
-      }
-    }
-
     function renderSubchartData(data) {
       // Always populate all subchart series with matching timestamps so logical indices stay 1:1 with candles
       rsiSeries.setData(data.rsi14 || []);
       macdHistSeries.setData(data.macd_hist || []);
       macdLineSeries.setData(data.macd_line || []);
       macdSigSeries.setData(data.macd_signal || []);
-      ewoSeries.setData(data.ewo || []);
 
-      updateSubchartHeaderTitle(data);
-
-      if (activeSubchart === "ewo") {
-        ewoSeries.applyOptions({ visible: true });
-        rsiSeries.applyOptions({ visible: false });
-        macdHistSeries.applyOptions({ visible: false });
-        macdLineSeries.applyOptions({ visible: false });
-        macdSigSeries.applyOptions({ visible: false });
-      } else if (activeSubchart === "rsi") {
-        ewoSeries.applyOptions({ visible: false });
+      if (activeSubchart === "rsi") {
+        document.getElementById("subchart-title").textContent = `RSI (14) — Current: ${data.tf_summary.rsi14}`;
         rsiSeries.applyOptions({ visible: true });
         macdHistSeries.applyOptions({ visible: false });
         macdLineSeries.applyOptions({ visible: false });
         macdSigSeries.applyOptions({ visible: false });
       } else {
-        ewoSeries.applyOptions({ visible: false });
+        document.getElementById("subchart-title").textContent = `MACD (12, 26, 9) Histogram & Signal`;
         rsiSeries.applyOptions({ visible: false });
         macdHistSeries.applyOptions({ visible: true });
         macdLineSeries.applyOptions({ visible: true });
@@ -2189,10 +2029,10 @@
         `${chartData.timeframe} Score: ${formatScoreCell(tfs.total_score)} &nbsp;|&nbsp; MTF: ${formatScoreCell(pairMeta.composite_score)}`;
 
       const pillars = [
-        { name: `Early Trend (DC10 + HMA + ST + DX:${tfs.dx14})`, weight: "45%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
-        { name: `Momentum Accel (Δ²H + EWO:${tfs.ewo} + RSI)`, weight: "30%", val: pairMeta.pillars.momentum, tfVal: tfs.momentum_score },
-        { name: "G8 Currency Strength Diff", weight: "15%", val: pairMeta.pillars.strength, tfVal: tfs.strength_score },
-        { name: "TPO Value Area (VAH/POC/VAL) & Squeeze", weight: "10%", val: pairMeta.pillars.volatility, tfVal: tfs.volatility_score },
+        { name: `Trend (HMA 9/21 + DX:${tfs.dx14} RAVI:${tfs.ravi}% CHOP:${tfs.chop14})`, weight: "35%", val: pairMeta.pillars.trend, tfVal: tfs.trend_score },
+        { name: "G8 Currency Strength Diff", weight: "25%", val: pairMeta.pillars.strength, tfVal: tfs.strength_score },
+        { name: "Momentum (RSI 14 + MACD)", weight: "25%", val: pairMeta.pillars.momentum, tfVal: tfs.momentum_score },
+        { name: "Volatility (BB + ATR Regime)", weight: "15%", val: pairMeta.pillars.volatility, tfVal: tfs.volatility_score },
       ];
 
       document.getElementById("pillar-bars-container").innerHTML = pillars.map(p => {
@@ -2226,7 +2066,7 @@
           </tr>
         </thead>
         <tbody>
-          ${[pairMeta.h1, pairMeta.h4, pairMeta.d1, pairMeta.w1].filter(Boolean).map(tf => `
+          ${[pairMeta.h4, pairMeta.d1, pairMeta.w1].map(tf => `
             <tr>
               <td style="font-weight:700; color:#fff;">${tf.timeframe}</td>
               <td>${formatScoreCell(tf.trend_score)}</td>
@@ -2249,12 +2089,8 @@
       document.getElementById("ticket-direction-badge").innerHTML =
         `<span style="color:${dirColor}; font-weight:800;">${tp.direction} (${tp.stop_mode === "H4_HMA21_TRAIL" ? "H4 HMA21" : tp.atr_timeframe + " ATR"}: ${tp.atr_pips}p)</span>`;
 
-      const exitBanner = pairMeta.asap_exit_flag
-        ? `<div style="background:rgba(245,158,11,0.18); border:1px solid #f59e0b; border-radius:6px; padding:6px 10px; margin-bottom:6px; color:#fbbf24; font-weight:700; font-size:11.5px;">${pairMeta.asap_exit_reason} • Donchian(5) Trail: ${pairMeta.donchian5_trail_stop.toFixed(dec)}</div>`
-        : `<div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Fast Donchian(5) Trailing Exit Level: <b style="color:#fbbf24;">${pairMeta.donchian5_trail_stop.toFixed(dec)}</b></div>`;
-
-      document.getElementById("ticket-main-grid").innerHTML = exitBanner + `
-        <div class="ticket-box" style="grid-column: span 1;">
+      document.getElementById("ticket-main-grid").innerHTML = `
+        <div class="ticket-box">
           <div class="ticket-label"><span class="live-dot"></span>Live Streaming Price (${pairMeta.hma_trigger})</div>
           <div class="ticket-val">${tp.entry_price.toFixed(dec)}</div>
         </div>
@@ -2330,50 +2166,35 @@
       renderScreenerTable();
     }
 
-    function syncOverlayChipClasses() {
-      document.getElementById("tog-clean").classList.toggle("active", cleanChartMode);
-      document.getElementById("tog-hma").classList.toggle("active", showHMA && !cleanChartMode);
-      document.getElementById("tog-dc").classList.toggle("active", showDonchianST && !cleanChartMode);
-      document.getElementById("tog-tpo").classList.toggle("active", showTPO && !cleanChartMode);
-      document.getElementById("tog-ema").classList.toggle("active", showEMA && !cleanChartMode);
-      document.getElementById("tog-bb").classList.toggle("active", showBB && !cleanChartMode);
-      document.getElementById("tog-levels").classList.toggle("active", showTradeLevels && !cleanChartMode);
-    }
-
-    function toggleCleanChartMode() {
-      cleanChartMode = !cleanChartMode;
-      syncOverlayChipClasses();
-      if (lastChartPayload) {
-        applyAllChartOverlays(lastChartPayload);
-      }
-    }
-
     function toggleOverlay(kind) {
-      if (cleanChartMode) {
-        cleanChartMode = false;
-      }
       if (kind === "hma") {
         showHMA = !showHMA;
-      } else if (kind === "dc") {
-        showDonchianST = !showDonchianST;
-      } else if (kind === "tpo") {
-        showTPO = !showTPO;
+        document.getElementById("tog-hma").classList.toggle("active", showHMA);
       } else if (kind === "ema") {
         showEMA = !showEMA;
+        document.getElementById("tog-ema").classList.toggle("active", showEMA);
       } else if (kind === "bb") {
         showBB = !showBB;
+        document.getElementById("tog-bb").classList.toggle("active", showBB);
       } else if (kind === "levels") {
         showTradeLevels = !showTradeLevels;
+        document.getElementById("tog-levels").classList.toggle("active", showTradeLevels);
       }
-      syncOverlayChipClasses();
       if (lastChartPayload) {
-        applyAllChartOverlays(lastChartPayload);
+        hma9Series.setData(showHMA ? (lastChartPayload.hma9 || []) : []);
+        hma21Series.setData(showHMA ? (lastChartPayload.hma21 || []) : []);
+        ema20Series.setData(showEMA ? lastChartPayload.ema20 : []);
+        ema50Series.setData(showEMA ? lastChartPayload.ema50 : []);
+        ema200Series.setData(showEMA ? lastChartPayload.ema200 : []);
+        bbUpperSeries.setData(showBB ? lastChartPayload.bb_upper : []);
+        bbLowerSeries.setData(showBB ? lastChartPayload.bb_lower : []);
+        drawTradeLevelLines(lastChartPayload.trade_plan, lastChartPayload.tracked_signals, lastChartPayload.candles || [], lastChartPayload.decimals);
+        drawTrackedSignalMarkers(lastChartPayload.candles || [], lastChartPayload.tracked_signals || [], lastChartPayload.decimals);
       }
     }
 
     function switchSubchart(mode) {
       activeSubchart = mode;
-      document.getElementById("tog-sub-ewo").classList.toggle("active", mode === "ewo");
       document.getElementById("tog-sub-rsi").classList.toggle("active", mode === "rsi");
       document.getElementById("tog-sub-macd").classList.toggle("active", mode === "macd");
       if (lastChartPayload) renderSubchartData(lastChartPayload);

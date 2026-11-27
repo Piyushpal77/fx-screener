@@ -16,6 +16,7 @@ env/
 
 # Local SQLite Cache & Exports
 .fx_screener_cache.sqlite3*
+.fx_screener2_cache.sqlite3*
 screener_export.csv
 screener_export.json
 

@@ -22,3 +22,7 @@ dependencies = [
 
 [project.scripts]
 fx-screener = "fx_screener.__main__:main"
+fx-screener2 = "fx_screener2.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["fx_screener*", "fx_screener2*"]
